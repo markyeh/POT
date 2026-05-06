@@ -8,8 +8,8 @@
     let gameState = 'BATTLE'; // BATTLE (ATB), ACTION_SELECT, TARGETING, BURST, GAME_OVER
     let previousState = 'BATTLE'; // 用於暫停後恢復
     let currentLanguage = 'en'; // 預設語言為英文
+    let devMode = false; // Dev 模式（無敵狀態）
     let gameLog = ""; // 初始化為空，等待載入訊息
-    let currentDifficulty = 'common'; // 預設難度
     
     let player = {
       hp: 100, maxHp: 100, 
@@ -18,10 +18,7 @@
       selectedAction: null
     };
   
-    let enemies = [
-      { id: 1, name: 'slime', word: 'apple', hp: 60, maxHp: 60, mp: 20, maxMp: 50, atb: 10, speed: 0.4 }, // 新增 MP 屬性
-      { id: 2, name: 'skeleton', word: 'bone', hp: 100, maxHp: 100, mp: 30, maxMp: 60, atb: 40, speed: 0.2 } // 新增 MP 屬性
-    ];
+    let enemies = [];
   
     let targetInput = "";
     let burstInput = "";
@@ -47,6 +44,7 @@
             mpNotEnough: "Not enough MP! Skill requires 30 MP.",
             skillActivated: "Skill activated! Combo damage increased by 2x!",
             targetingPrompt: "Enter the word above the monster to target...",
+            devMode: "Dev Mode",
             burstPrompt: "TYPE:",
             burstPlaceholder: "Type fast!",
             comboEnd: (comboCount) => `Combo ended! Total ${comboCount} combos completed.`,
@@ -80,6 +78,7 @@
             mpNotEnough: "MP 不足！發動技能需要 30 點 MP。",
             skillActivated: "發動技能！連擊傷害提升為 2 倍！",
             targetingPrompt: "請輸入怪物頭上的單字來鎖定目標...",
+            devMode: "開發者模式",
             burstPrompt: "輸入:",
             burstPlaceholder: "快打！",
             comboEnd: (comboCount) => `連擊結束！總共完成了 ${comboCount} 次連擊。`,
@@ -113,15 +112,15 @@
     // Set initial gameLog based on default language
     gameLog = t('gameLogInitializing');
   
-    onMount(() => {
-      loadAllDictionaries();
+    onMount(async () => {
+      await loadAllDictionaries();
+      spawnMonsters();
   
       const timer = setInterval(() => {
         if (isLoaded && gameState !== 'PAUSED' && gameState !== 'GAME_OVER') { // 暫停或結束時停止 ATB
           updateATB();
         }
       }, 50);
-
       return () => {
         clearInterval(timer);
         if (burstInterval) clearInterval(burstInterval);
@@ -130,20 +129,37 @@
 
     async function loadAllDictionaries() {
       try {
-        const tiers = ['common', 1000, 3000, 5000, 7000];
-        const fetchPromises = tiers.map(tier => 
-          fetch(`/data/words_${tier}.json`).then(res => {
+        const tiers = ['white', 'magic', 'rare', 'unique'];
+        const fetchPromises = tiers.map(tier => {
+          // 新增 console.log 幫助確認實際載入的檔案路徑
+          const path = `data/words_${tier}.json`;
+          console.log(`[loadAllDictionaries] Attempting to fetch: ${path}`);
+          return fetch(path).then(res => {
             if (!res.ok) {
-              throw new Error(`無法讀取難度 ${tier} 的單字庫 (HTTP ${res.status})`);
+              throw new Error(`File not found: ${path} (HTTP ${res.status}). Please ensure the file exists in public/data/`);
             }
             return res.json();
-          })
-        );
+          });
+        });
         
         const results = await Promise.all(fetchPromises);
         
         tiers.forEach((tier, index) => {
-          dictionaries[tier] = results[index].map(w => w.toLowerCase());
+          const data = results[index];
+          let wordList = [];
+
+          // 相容兩種格式：直接是陣列，或是包含 words 屬性的物件
+          if (Array.isArray(data)) {
+            wordList = data;
+          } else if (data && Array.isArray(data.words)) {
+            wordList = data.words;
+          }
+
+          if (wordList.length > 0) {
+            dictionaries[tier] = wordList.map(w => w.toLowerCase());
+          } else {
+            dictionaries[tier] = [];
+          }
         });
 
         isLoaded = true;
@@ -152,6 +168,33 @@
         console.error("Failed to load dictionaries:", error);
         gameLog = t('gameLogError');
       }
+    }
+
+    function spawnMonsters() {
+      const tiers = ['white', 'magic', 'rare', 'unique'];
+      const config = {
+        white:  { hp: 60,  speed: 0.3, icon: '👻', color: '#ffffff' },
+        magic:  { hp: 120, speed: 0.5, icon: '🔮', color: '#3498db' },
+        rare:   { hp: 250, speed: 0.7, icon: '💎', color: '#f1c40f' },
+        unique: { hp: 600, speed: 1.0, icon: '👑', color: '#9b59b6' }
+      };
+
+      enemies = tiers.map((tier, index) => {
+        const pool = dictionaries[tier] || ['error'];
+        const randomWord = pool[Math.floor(Math.random() * pool.length)];
+        return {
+          id: index + 1,
+          name: tier.toUpperCase(),
+          word: randomWord,
+          hp: config[tier].hp,
+          maxHp: config[tier].hp,
+          mp: 50, maxMp: 50,
+          atb: Math.random() * 30, // 隨機初始進度
+          speed: config[tier].speed,
+          wordType: tier,
+          icon: config[tier].icon
+        };
+      });
     }
   
     function updateATB() {
@@ -178,7 +221,10 @@
     function enemyAttack(enemy) {
       const damage = 10;
       const enemyName = enemy.toLowerCase();
-      player.hp = Math.max(0, player.hp - damage);
+      
+      if (!devMode) {
+        player.hp = Math.max(0, player.hp - damage);
+      }
 
       // 觸發玩家受傷特效
       player.isHit = true;
@@ -209,10 +255,7 @@
         atb: 0, speed: 0.8, isHit: false,
         selectedAction: null
       };
-      enemies = [
-        { id: 1, name: 'slime', word: 'apple', hp: 60, maxHp: 60, mp: 20, maxMp: 50, atb: 10, speed: 0.4 },
-        { id: 2, name: 'skeleton', word: 'bone', hp: 100, maxHp: 100, mp: 30, maxMp: 60, atb: 40, speed: 0.2 }
-      ];
+      spawnMonsters();
       gameState = 'BATTLE'; // 重置遊戲狀態
       gameLog = t('gameRestarted');
       targetInput = "";
@@ -291,7 +334,9 @@
   
     function nextBurstWord() {
       burstInput = "";
-      const pool = dictionaries[currentDifficulty];
+      // 使用當前目標怪物的難度等級來決定單字庫
+      const poolKey = currentTarget?.wordType;
+      const pool = dictionaries[poolKey];
       if (!pool || pool.length === 0) {
         currentBurstWord = "error";
         return;
@@ -348,145 +393,173 @@
   
   <svelte:window on:keydown={handleGlobalKeyDown} />
   
-  <main class="game-container">
-    <div class="language-switcher">
+  <header class="game-header">
+    <div class="game-title">TYPE: Keyboard Adventurer</div>
+    <div class="header-controls">
+      <button class="dev-toggle" class:active={devMode} on:click={() => devMode = !devMode}>{t('devMode')}: {devMode ? 'ON' : 'OFF'}</button>
       <button on:click={() => currentLanguage = 'en'} class:active={currentLanguage === 'en'}>EN</button>
       <button on:click={() => currentLanguage = 'zh'} class:active={currentLanguage === 'zh'}>ZH</button>
     </div>
+  </header>
 
-    <!-- 暫停/結束 選單遮罩 -->
-    {#if gameState === 'PAUSED' || gameState === 'GAME_OVER'}
-      <div class="modal-overlay">
-        <div class="modal-content">
-          {#if gameState === 'GAME_OVER'}
-            <h1 style="color: #ff4757;">{t('playerDefeated')}</h1>
-          {:else}
-            <h1>{t('gamePaused')}</h1>
-            <button on:click={togglePause}>{t('continueGame')}</button>
-          {/if}
-          <button on:click={restartGame}>{t('restartGame')}</button>
-        </div>
-      </div>
-    {/if}
+  <div class="game-viewport">
+    <main class="game-container">
 
-    <!-- 第一人稱戰鬥畫面 -->
-    <div class="battle-scene">
-      {#each enemies as enemy}
-        <div class="monster-wrapper" class:dead={enemy.hp <= 0} class:hit={enemy.isHit}>
-          <div class="monster-name">{enemy.name.toLowerCase()}</div>
-          <div class="monster-sprite">
-            {enemy.name.toLowerCase() === 'slime' ? '💧' : '💀'}
-          </div>
-          <div class="monster-word">{enemy.word.toLowerCase()}</div>
-          <div class="stat-row">{t('hp')}: {enemy.hp} / {enemy.maxHp}</div> <!-- 顯示怪物 HP 數值 -->
-          <div class="bar-container">
-            <div class="hp-fill" style="width: {(enemy.hp/enemy.maxHp)*100}%"></div>
-          </div>
-          <div class="stat-row">{t('mp')}: {enemy.mp} / {enemy.maxMp}</div> <!-- 顯示怪物 MP 數值 -->
-          <div class="bar-container">
-            <div class="mp-fill" style="width: {(enemy.mp/enemy.maxMp)*100}%"></div>
-          </div>
-          <div class="stat-row">{t('atb')}: {Math.floor(enemy.atb)}%</div> <!-- 顯示怪物 ATB 數值 -->
-          <div class="bar-container atb">
-            <div class="atb-fill" style="width: {enemy.atb}%"></div>
+      <!-- 暫停/結束 選單遮罩 -->
+      {#if gameState === 'PAUSED' || gameState === 'GAME_OVER'}
+        <div class="modal-overlay">
+          <div class="modal-content">
+            {#if gameState === 'GAME_OVER'}
+              <h1 style="color: #fff;">{t('playerDefeated')}</h1>
+            {:else}
+              <h1>{t('gamePaused')}</h1>
+              <button on:click={togglePause}>{t('continueGame')}</button>
+            {/if}
+            <button on:click={restartGame}>{t('restartGame')}</button>
           </div>
         </div>
-      {/each}
-    </div>
-  
-    <!-- 戰鬥日誌 -->
-    <div class="message-log">{gameLog}</div>
-  
-    <!-- 下方 UI 區 -->
-    <div class="ui-panel">
-      <div class="player-stats" class:hit={player.isHit}>
-        <div class="stat-row">{t('hp')}: {player.hp} / {player.maxHp}</div>
-        <div class="bar-container player-hp-bar">
-          <div class="hp-fill player" style="width: {(player.hp/player.maxHp)*100}%"></div>
-        </div>
-        <div class="stat-row">{t('mp')}: {player.mp} / {player.maxMp}</div> <!-- 顯示玩家 MP 數值 -->
-        <div class="bar-container player-mp-bar">
-          <div class="mp-fill" style="width: {(player.mp/player.maxMp)*100}%"></div>
-        </div>
-        <div class="stat-row">{t('atb')}: {Math.floor(player.atb)}%</div> <!-- 顯示玩家 ATB 數值 -->
-        <div class="bar-container player-atb-bar">
-          <div class="atb-fill" style="width: {player.atb}%"></div>
-        </div>
-      </div>
+      {/if}
 
-      <div class="difficulty-select">
-        <select bind:value={currentDifficulty}>
-          <option value="common">{t('commonWords')}</option>
-          <option value={1000}>1000 {t('words')}</option>
-          <option value={3000}>3000 {t('words')}</option>
-          <option value={5000}>5000 {t('words')}</option>
-          <option value={7000}>7000 {t('words')}</option>
-        </select>
-      </div>
-  
-      <div class="input-area">
-        {#if gameState === 'ACTION_SELECT'}
-          <div class="action-menu">
-            <span class="key-hint">A</span> {t('attack')}
-            <span class="key-hint">S</span> {t('skill')}
-            <span class="key-hint">I</span> {t('item')}
-            <span class="key-hint">B</span> {t('block')}
-            <span class="key-hint">R</span> {t('run')}
+      <!-- 第一人稱戰鬥畫面 -->
+      <div class="battle-scene">
+        {#each enemies as enemy}
+          <div 
+            class="monster-wrapper" 
+            class:dead={enemy.hp <= 0} 
+            class:hit={enemy.isHit}
+            style="--tier-color: {enemy.wordType === 'white' ? '#fff' : (enemy.wordType === 'magic' ? '#3498db' : (enemy.wordType === 'rare' ? '#f1c40f' : '#9b59b6'))}">
+            <div class="monster-name">{enemy.name.toLowerCase()}</div>
+            <div class="monster-sprite">
+              {enemy.icon}
+            </div>
+            <div class="monster-word">{enemy.word.toLowerCase()}</div>
+            <div class="stat-row">{t('hp')}: {enemy.hp} / {enemy.maxHp}</div> <!-- 顯示怪物 HP 數值 -->
+            <div class="bar-container">
+              <div class="hp-fill" style="width: {(enemy.hp/enemy.maxHp)*100}%"></div>
+            </div>
+            <div class="stat-row">{t('mp')}: {enemy.mp} / {enemy.maxMp}</div> <!-- 顯示怪物 MP 數值 -->
+            <div class="bar-container">
+              <div class="mp-fill" style="width: {(enemy.mp/enemy.maxMp)*100}%"></div>
+            </div>
+            <div class="stat-row">{t('atb')}: {Math.floor(enemy.atb)}%</div> <!-- 顯示怪物 ATB 數值 -->
+            <div class="bar-container atb">
+              <div class="atb-fill" style="width: {enemy.atb}%"></div>
+            </div>
+            <div class="monster-source">words_{enemy.wordType}.json</div>
           </div>
-        {:else if gameState === 'TARGETING'}
-          <input 
-            bind:value={targetInput} 
-            on:input={checkTargeting}
-            placeholder={t('targetingPrompt')}
-            autofocus 
-          />
-        {:else if gameState === 'BURST'}
-          <div class="burst-container">
-            <div class="timer-bar" style="width: {(burstTimeLeft/burstMaxTime)*100}%"></div>
-            <div class="timer-text">{(burstTimeLeft / 1000).toFixed(1)}s</div>
-            <div class="combo">{t('combo')}: {comboCount}</div>
-            <div class="burst-word">{t('burstPrompt')} <span>{currentBurstWord}</span></div>
+        {/each}
+      </div>
+    
+      <!-- 戰鬥日誌 -->
+      <div class="message-log">{gameLog}</div>
+    
+      <!-- 下方 UI 區 -->
+      <div class="ui-panel">
+        <div class="player-stats" class:hit={player.isHit}>
+          <div class="stat-row">{t('hp')}: {player.hp} / {player.maxHp}</div>
+          <div class="bar-container player-hp-bar">
+            <div class="hp-fill player" style="width: {(player.hp/player.maxHp)*100}%"></div>
+          </div>
+          <div class="stat-row">{t('mp')}: {player.mp} / {player.maxMp}</div> <!-- 顯示玩家 MP 數值 -->
+          <div class="bar-container player-mp-bar">
+            <div class="mp-fill" style="width: {(player.mp/player.maxMp)*100}%"></div>
+          </div>
+          <div class="stat-row">{t('atb')}: {Math.floor(player.atb)}%</div> <!-- 顯示玩家 ATB 數值 -->
+          <div class="bar-container player-atb-bar">
+            <div class="atb-fill" style="width: {player.atb}%"></div>
+          </div>
+        </div>
+    
+        <div class="input-area">
+          {#if gameState === 'ACTION_SELECT'}
+            <div class="action-menu">
+              <span class="key-hint">A</span> {t('attack')}
+              <span class="key-hint">S</span> {t('skill')}
+              <span class="key-hint">I</span> {t('item')}
+              <span class="key-hint">B</span> {t('block')}
+              <span class="key-hint">R</span> {t('run')}
+            </div>
+          {:else if gameState === 'TARGETING'}
             <input 
-              bind:value={burstInput} 
-              on:input={handleBurstTyping} 
-              placeholder={t('burstPlaceholder')}
+              bind:value={targetInput} 
+              on:input={checkTargeting}
+              placeholder={t('targetingPrompt')}
               autofocus 
             />
-          </div>
-        {/if}
+          {:else if gameState === 'BURST'}
+            <div class="burst-container">
+              <div class="timer-bar" style="width: {(burstTimeLeft/burstMaxTime)*100}%"></div>
+              <div class="timer-text">{(burstTimeLeft / 1000).toFixed(1)}s</div>
+              <div class="combo">{t('combo')}: {comboCount}</div>
+              <div class="burst-word">{t('burstPrompt')} <span>{currentBurstWord}</span></div>
+              <input 
+                bind:value={burstInput} 
+                on:input={handleBurstTyping} 
+                placeholder={t('burstPlaceholder')}
+                autofocus 
+              />
+            </div>
+          {/if}
+        </div>
       </div>
-    </div>
-  </main>
+    </main>
+  </div>
   
   <style>
     :global(body) {
-      background-color: #121212;
-      color: #eee;
+      background-color: #000;
+      color: #fff;
       font-family: 'Courier New', monospace;
       margin: 0;
       display: flex;
-      justify-content: center;
-      align-items: center;
+      flex-direction: column;
       height: 100vh;
+      overflow: hidden;
     }
   
-    .language-switcher {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 1001;
+    .game-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 20px;
+      border-bottom: 1px solid #fff;
+      background: #000;
+      width: 100%;
+      box-sizing: border-box;
+      z-index: 10;
     }
-    .language-switcher button {
-      background: #333; color: #eee; border: 1px solid #555; padding: 5px 10px; margin-left: 5px;
+
+    .game-title {
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+
+    .header-controls {
+      display: flex;
+      gap: 10px;
+    }
+
+    .header-controls button {
+      background: #000; color: #fff; border: 1px solid #fff; padding: 3px 8px;
       cursor: pointer; font-family: inherit;
+      font-size: 0.7rem;
     }
-    .language-switcher button.active { background: #555; border-color: #777; }
+    .header-controls button.active { background: #fff; color: #000; }
+
+    .game-viewport {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
 
     .game-container {
-      width: 800px;
-      height: 600px;
-      background: #1a1a1a;
-      border: 4px solid #333;
+      width: 850px;
+      height: 650px;
+      background: #000;
+      border: 1px solid #fff;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -496,29 +569,29 @@
     .modal-overlay {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.85);
+      background: rgba(0, 0, 0, 0.95);
       display: flex; justify-content: center; align-items: center;
       z-index: 1000;
     }
     .modal-content {
       text-align: center;
-      background: #222;
+      background: #000;
       padding: 40px;
-      border: 2px solid #555;
+      border: 1px solid #fff;
     }
     .modal-content button {
       display: block; width: 220px; margin: 15px auto; padding: 12px;
-      background: #444; color: white; border: 1px solid #777;
+      background: #000; color: #fff; border: 1px solid #fff;
       font-family: inherit; cursor: pointer; font-size: 1rem;
     }
-    .modal-content button:hover { background: #666; }
+    .modal-content button:hover { background: #fff; color: #000; }
 
     .battle-scene {
       flex: 3;
       display: flex;
       justify-content: space-around;
       align-items: center;
-      background: linear-gradient(to bottom, #2c3e50, #000);
+      background: #000;
       perspective: 500px;
     }
   
@@ -537,30 +610,30 @@
     }
 
     @keyframes shake {
-      0% { transform: translate(1px, 1px) rotate(0deg); }
-      25% { transform: translate(-2px, -1px) rotate(-1deg); }
-      50% { transform: translate(-1px, 2px) rotate(1deg); }
-      75% { transform: translate(2px, 1px) rotate(-1deg); }
-      100% { transform: translate(1px, -2px) rotate(0deg); }
+      0% { transform: translate(2px, 0); }
+      25% { transform: translate(-2px, 0); }
+      50% { transform: translate(2px, 0); }
+      75% { transform: translate(-2px, 0); }
+      100% { transform: translate(0, 0); }
     }
 
     @keyframes flash {
-      0% { filter: brightness(1) contrast(1); }
-      50% { filter: brightness(3) contrast(2); }
-      100% { filter: brightness(1) contrast(1); }
+      0% { filter: invert(0); }
+      50% { filter: invert(1); }
+      100% { filter: invert(0); }
     }
 
     .player-stats.hit {
       animation: player-flash 0.15s ease-out;
     }
     @keyframes player-flash {
-      0% { filter: brightness(1) contrast(1); border-color: #333; }
-      50% { filter: brightness(2) contrast(1.5); border-color: red; }
-      100% { filter: brightness(1) contrast(1); border-color: #333; }
+      0% { background: #000; }
+      50% { background: #fff; }
+      100% { background: #000; }
     }
     .monster-name {
       font-size: 0.8rem;
-      color: #999;
+      color: var(--tier-color, #fff);
       text-transform: none;
       margin-bottom: 5px;
       letter-spacing: 1px;
@@ -569,8 +642,8 @@
     .monster-word {
       font-size: 1.2rem;
       font-weight: bold;
-      color: #00ffcc;
-      text-shadow: 0 0 8px rgba(0, 255, 204, 0.6);
+      color: var(--tier-color, #fff);
+      text-shadow: none;
       margin-bottom: 8px;
     }
 
@@ -584,29 +657,37 @@
     .monster-sprite {
       font-size: 3rem;
       margin-bottom: 5px;
+      filter: drop-shadow(0 0 5px var(--tier-color, transparent));
+    }
+
+    .monster-source {
+      font-size: 0.6rem;
+      color: #666;
+      margin-top: 2px;
     }
 
     .bar-container {
       width: 100px;
-      height: 6px;
-      background: #444;
+      height: 4px;
+      background: #000;
+      border: 1px solid #fff;
       margin: 4px auto;
     }
   
-    .hp-fill { height: 100%; background: #ff4757; transition: width 0.3s; }
-    .atb-fill { height: 100%; background: #ffa502; } /* ATB 統一為黃色 */
-    .mp-fill { height: 100%; background: #1e90ff; transition: width 0.3s; } /* MP 統一為藍色 */
-    .mp-fill.player { background: #6a5acd; }
+    .hp-fill { height: 100%; background: #fff; transition: width 0.3s; }
+    .atb-fill { height: 100%; background: #fff; }
+    .mp-fill { height: 100%; background: #fff; transition: width 0.3s; }
+    .mp-fill.player { background: #fff; }
     .player-hp-bar, .player-mp-bar {
-      width: 100%; height: 10px; margin-bottom: 5px;
+      width: 100%; height: 8px; margin-bottom: 5px;
     }
   
     .message-log {
       flex: 0.5;
-      background: #222;
+      background: #000;
       padding: 10px;
-      border-top: 2px solid #333;
-      border-bottom: 2px solid #333;
+      border-top: 1px solid #fff;
+      border-bottom: 1px solid #fff;
       font-size: 0.9rem;
     }
   
@@ -618,17 +699,8 @@
     }
   
     .player-stats { width: 150px; }
-    .player-atb-bar { width: 100%; height: 10px; }
+    .player-atb-bar { width: 100%; height: 8px; }
 
-    .difficulty-select select {
-      background: #333;
-      color: white;
-      border: 1px solid #555;
-      padding: 5px;
-      font-family: inherit;
-      font-size: 0.8rem;
-    }
-  
     .input-area {
       flex: 1;
       display: flex;
@@ -638,10 +710,10 @@
   
     .action-menu { font-size: 1.2rem; }
     .key-hint {
-      background: #eee;
+      background: #fff;
       color: #000;
       padding: 2px 8px;
-      border-radius: 4px;
+      border-radius: 0;
       margin-right: 5px;
     }
   
@@ -651,16 +723,16 @@
       font-size: 1.5rem;
       background: transparent;
       border: none;
-      border-bottom: 2px solid #ffa502;
+      border-bottom: 1px solid #fff;
       color: white;
       text-align: center;
       outline: none;
     }
   
     .burst-container { text-align: center; width: 100%; }
-    .timer-bar { height: 4px; background: #ffa502; margin-bottom: 10px; transition: width 0.1s linear; }
-    .timer-text { font-size: 1rem; color: #ffa502; margin-bottom: 5px; font-weight: bold; }
-    .burst-word span { color: #ff4757; font-size: 2rem; font-weight: bold; }
-    .combo { font-size: 1.2rem; color: #ffa502; }
+    .timer-bar { height: 4px; background: #fff; margin-bottom: 10px; transition: width 0.1s linear; }
+    .timer-text { font-size: 1rem; color: #fff; margin-bottom: 5px; font-weight: bold; }
+    .burst-word span { color: #fff; font-size: 2rem; font-weight: bold; text-decoration: underline; }
+    .combo { font-size: 1.2rem; color: #fff; }
   </style>
   
