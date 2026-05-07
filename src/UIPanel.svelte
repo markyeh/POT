@@ -104,7 +104,7 @@
     display: flex; 
     flex-direction: column;
     flex-shrink: 0;
-    padding: 10px 20px; gap: 10px; background: rgba(255,255,255,0.05); box-sizing: border-box;
+    padding: 10px 20px; gap: 10px; background: var(--color-bg-soft); box-sizing: border-box;
   }
   .input-area {
     flex: 1; 
@@ -127,16 +127,17 @@
 
   /* 統一進度條容器樣式 (參考 HP Bar) */
   .bar-container {
-    width: 100%; height: 20px; background: #1a1a1a; border: 1px solid #444;
+    width: 100%; height: 20px; background: var(--color-bg-soft); border: 1px solid var(--color-border);
     border-radius: 2px; overflow: hidden; position: relative;
     display: flex; align-items: center; justify-content: center;
+    box-shadow: inset 0 1px 3px var(--ui-shadow);
   }
 
   .bar-text-overlay {
     position: relative; z-index: 2; display: flex; justify-content: space-between;
     align-items: center; width: 100%; padding: 0 10px; box-sizing: border-box;
     font-weight: bold; color: #fff; font-size: 0.75rem;
-    text-shadow: 1px 1px 1px #000, -1px -1px 1px #000, 1px -1px 1px #000, -1px 1px 1px #000;
+    text-shadow: var(--text-shadow, 1px 1px 1px #000);
   }
 
   .progress-fill {

@@ -35,6 +35,13 @@
       Q: null, W: null, E: null, R: null, T: null
     };
 
+    // --- 主題設定 ---
+    let currentTheme = 'default';
+    function setTheme(theme) {
+      currentTheme = theme;
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+
     // --- 輔助函數：獲取初始玩家狀態 ---
     function getInitialPlayerState(isDev = false) {
       const hp = isDev ? (gameConfig.devmode?.playerInitialHp || 1000) : (gameConfig.player?.initialHp || 100);
@@ -171,7 +178,6 @@
       const currentSelected = enemies.find(e => e.id === selectedMonsterId);
       if (aliveEnemies.length > 0 && (!currentSelected || currentSelected.hp <= 0)) {
         selectedMonsterId = aliveEnemies.reduce((prev, curr) => (prev.hp < curr.hp ? prev : curr)).id;
-        console.log("Reactive: selectedMonsterId auto-set to", selectedMonsterId);
       }
     }
 
@@ -265,7 +271,10 @@
             skillsHeader: "SKILLS REPOSITORY",
             clear: "CLEAR",
             currentLoadout: "CURRENT LOADOUT",
-            availableSkills: "AVAILABLE SKILLS"
+            availableSkills: "AVAILABLE SKILLS",
+            theme: "THEME",
+            themeDefault: "DEFAULT",
+            themeMinimalBlack: "MINIMAL BLACK"
         },
         zh: {
             gameLogInitializing: "正在初始化單字庫...",
@@ -322,7 +331,10 @@
             skillsHeader: "技能庫",
             clear: "清除",
             currentLoadout: "目前裝備",
-            availableSkills: "可用技能"
+            availableSkills: "可用技能",
+            theme: "主題",
+            themeDefault: "預設",
+            themeMinimalBlack: "極簡黑"
         }
     };
 
@@ -968,10 +980,11 @@
   <svelte:window on:keydown={handleGlobalKeyDown} />
   
   <Header 
-    {t} {currentLanguage} {showLog} {showSkillsWindow}
+    {t} {currentLanguage} {showLog} {showSkillsWindow} {currentTheme}
     hotkeys={gameConfig.hotkeys || {}}
     onToggleLog={() => showLog = !showLog}
     onToggleSkills={onToggleSkills}
+    onSetTheme={setTheme}
     onToggleHelp={() => {
       showHelp = !showHelp;
       if (showHelp && gameState !== 'PAUSED') {
@@ -1032,17 +1045,6 @@
   </div>
   
   <style>
-    :global(body) {
-      background-color: #000;
-      color: #fff;
-      font-family: 'Courier New', monospace;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
-  
     .game-viewport {
       flex: 1;
       display: flex;
@@ -1056,8 +1058,8 @@
     .game-container {
       width: 850px;
       height: 750px; /* 增加總高度 */
-      background: #000;
-      border: 1px solid #fff;
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
       display: flex;
       flex-direction: column;
       overflow: hidden;

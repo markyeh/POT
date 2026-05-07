@@ -30,12 +30,12 @@
     : `left: ${((selectedIndex % 3) * 33.33) + 16.66}%; top: ${Math.floor(selectedIndex / 3) * 33.33 + 16.66}%; width: 30%; height: 30%;`
   ) : "";
 
-  // 階級色彩映射表
+  // 階級色彩映射表 - 改用 CSS 變數以支援主題切換
   const tierColors = {
-    white: '#fff',
-    magic: '#3498db',
-    rare: '#f1c40f',
-    unique: '#d35400'
+    white: 'var(--tier-white, #fff)',
+    magic: 'var(--tier-magic, #3498db)',
+    rare: 'var(--tier-rare, #f1c40f)',
+    unique: 'var(--tier-unique, #d35400)'
   };
 
   let hoveredSkill = null;
@@ -232,7 +232,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: #000;
+    background: var(--color-bg);
     perspective: 500px;
     position: relative;
   }
@@ -298,33 +298,33 @@
   /* --- 怪物階級特效增強 --- */
   .tier-magic .monster-icon {
     animation: magic-glow 2s infinite alternate ease-in-out;
-    filter: drop-shadow(0 0 8px var(--tier-color));
+    filter: drop-shadow(0 0 calc(8px * var(--monster-glow-opacity)) var(--tier-color));
   }
   @keyframes magic-glow {
-    from { filter: drop-shadow(0 0 5px var(--tier-color)); }
-    to { filter: drop-shadow(0 0 15px var(--tier-color)) brightness(1.2); }
+    from { filter: drop-shadow(0 0 4px var(--tier-color)); }
+    to { filter: drop-shadow(0 0 10px var(--tier-color)) brightness(1.1); }
   }
 
   .tier-rare .monster-icon {
     animation: rare-shimmer 1.5s infinite alternate ease-in-out;
-    filter: drop-shadow(0 0 12px var(--tier-color));
+    filter: drop-shadow(0 0 calc(12px * var(--monster-glow-opacity)) var(--tier-color));
   }
   @keyframes rare-shimmer {
     0% { transform: scale(1); filter: drop-shadow(0 0 8px var(--tier-color)); }
-    100% { transform: scale(1.05); filter: drop-shadow(0 0 20px var(--tier-color)) brightness(1.3); }
+    100% { transform: scale(1.05); filter: drop-shadow(0 0 15px var(--tier-color)) brightness(1.2); }
   }
 
   .tier-unique .monster-icon {
     animation: unique-pulse 1s infinite alternate cubic-bezier(0.45, 0.05, 0.55, 0.95);
-    filter: drop-shadow(0 0 20px var(--tier-color));
+    filter: drop-shadow(0 0 calc(20px * var(--monster-glow-opacity)) var(--tier-color));
   }
   @keyframes unique-pulse {
     0% { transform: scale(1); filter: drop-shadow(0 0 15px var(--tier-color)); }
-    100% { transform: scale(1.1); filter: drop-shadow(0 0 35px var(--tier-color)) brightness(1.4); }
+    100% { transform: scale(1.1); filter: drop-shadow(0 0 25px var(--tier-color)) brightness(1.2); }
   }
 
   /* 讓血條邊框也有對應光暈 */
-  .bar-container.hp-main { box-shadow: 0 0 10px rgba(0,0,0,0.5), 0 0 5px var(--tier-color); }
+  .bar-container.hp-main { box-shadow: 0 2px 5px var(--ui-shadow), 0 0 2px var(--tier-color); }
 
   /* Unique Monster (Boss) 佔滿 3x3 網格 */
   .monster-wrapper.unique {
@@ -412,15 +412,15 @@
   /* 獨立選擇框樣式 */
   .selection-frame {
     position: absolute;
-    border: 2px solid yellow;
-    box-shadow: 0 0 15px rgba(255, 255, 0, 0.5), inset 0 0 10px rgba(255, 255, 0, 0.3);
+    border: 2px solid var(--selection-border);
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
     top: 50%;
     transform: translate(-50%, -50%); /* 改為 -50% 達成真正的垂直置中 */
     transition: left 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), top 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), width 0.25s ease, height 0.25s ease;
     pointer-events: none;
     z-index: 10;
     border-radius: 4px;
-    background: rgba(255, 255, 0, 0.05);
+    background: transparent;
   }
 
   .player-section {
@@ -454,12 +454,13 @@
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    border: 2px solid #444;
+    border: 1px solid var(--color-border);
     position: relative;
     overflow: hidden;
-    background: #111;
-    box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    background: #111; /* Orb 保持深色以維持質感，但在淺色模式下降低對比 */
+    box-shadow: inset 0 0 10px #000, 0 2px 5px var(--ui-shadow);
   }
+  [data-theme*="minimal"] .orb { background: var(--color-bg-soft); border-color: var(--color-border); }
   .hp-orb .liquid {
     background: linear-gradient(0deg, #600 0%, #f00 100%);
     box-shadow: 0 0 20px rgba(255,0,0,0.5);
@@ -472,6 +473,7 @@
     position: absolute;
     bottom: 0; left: 0; width: 100%;
     transition: height 0.5s ease-out;
+    opacity: 0.9;
   }
   .orb-glass {
     position: absolute;
@@ -483,6 +485,7 @@
     position: absolute;
     width: 100%; text-align: center; top: 50%; transform: translateY(-50%);
     font-weight: bold; font-size: 0.9rem; text-shadow: 1px 1px 3px #000; z-index: 2;
+    color: #fff !important;
   }
 
   /* Action Bar Styles */
@@ -496,13 +499,13 @@
   .flasks-row { display: flex; gap: 8px; }
   .flask-slot {
     width: 34px; height: 50px;
-    border: 1px solid #aaa; /* 提高邊框亮度 */
-    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-soft);
     border-radius: 3px;
     position: relative;
     overflow: hidden;
     cursor: pointer;
-    box-shadow: inset 0 0 8px rgba(0,0,0,0.8);
+    box-shadow: inset 0 0 5px var(--orb-inner-shadow);
   }
   .flask-fill { 
     position: absolute; bottom: 0; left: 0; width: 100%; 
@@ -648,10 +651,10 @@
     font-weight: bold; 
     color: #fff;
     font-size: 0.75rem;
-    text-shadow: 1px 1px 1px #000, -1px -1px 1px #000, 1px -1px 1px #000, -1px 1px 1px #000; /* 四向陰影確保清晰度 */
+    text-shadow: var(--text-shadow); 
   }
   .name-base { 
-    color: #fff; /* 名稱改為白色，不再與紅色血條衝突 */
+    color: inherit;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
