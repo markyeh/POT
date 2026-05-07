@@ -7,9 +7,8 @@
   export let lastClickedSkillSlotKey; // 接收最後點擊的技能欄位
   export let onSelectSlot; // 用於切換選中的欄位
   export let currentLanguage;
-
-  // Define the keys for visual representation
-  const slots = ['Q', 'W', 'E', 'R', 'T'];
+  export let skillSlots = ['Q', 'W', 'E', 'R', 'T']; // 改為由 prop 傳入
+  export let hotkeys = {};
 
   let hoveredSkill = null;
   let tooltipPos = { x: 0, y: 0 };
@@ -32,13 +31,13 @@
 <div class="skill-sidebar">
   <div class="sidebar-header">
     SKILLS REPOSITORY
-    <button class="close-x-btn" on:click={onToggleSkills} title="Close [9]">×</button>
+    <button class="close-x-btn" on:click={onToggleSkills} title="Close [{hotkeys.toggleSkills || '9'}]">×</button>
   </div>
   
   <div class="equipped-section">
     <div class="section-title">CURRENT LOADOUT</div>
     <div class="loadout-grid">
-      {#each slots as key, i}
+      {#each skillSlots as key, i}
         <div class="loadout-slot" 
           on:dragover|preventDefault
           on:drop={(e) => {

@@ -8,6 +8,7 @@
   export let onToggleLog;
   export let onToggleHelp;
   export let finalResults = { time: 0, wpm: 0 };
+  export let hotkeys = {};
 </script>
 
 {#if gameState === 'PAUSED' || gameState === 'GAME_OVER' || gameState === 'VICTORY'}
@@ -27,10 +28,10 @@
         
         <div class="menu-options">
           <button class="toggle-btn" on:click={onToggleLog}>
-            {showLog ? 'CLOSE LOG' : 'OPEN LOG'} (0)
+            {showLog ? 'CLOSE LOG' : 'OPEN LOG'} ({hotkeys.toggleLog || '0'})
           </button>
           <button class="toggle-btn" on:click={onToggleHelp}>
-            {showHelp ? 'HIDE HELP' : 'SHOW HELP'} (?)
+            {showHelp ? 'HIDE HELP' : 'SHOW HELP'} ({hotkeys.toggleHelp || '?'})
           </button>
         </div>
       {/if}

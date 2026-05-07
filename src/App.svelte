@@ -47,7 +47,10 @@
         player.lastHeal = amount;
         player = player;
         addLog(t('flaskUsed', t('hp')), 'info');
-        setTimeout(() => { player.lastHeal = 0; player = player; }, 1000);
+        setTimeout(() => { 
+          player.lastHeal = 0; 
+          player = player; 
+        }, gameConfig.combat?.visualEffectDuration || 1000);
       } else {
         addLog(t('flaskEmpty', t('hp')), 'info');
       }
@@ -61,7 +64,10 @@
         player.lastMpRegen = amount;
         player = player;
         addLog(t('flaskUsed', t('mp')), 'info');
-        setTimeout(() => { player.lastMpRegen = 0; player = player; }, 1000);
+        setTimeout(() => { 
+          player.lastMpRegen = 0; 
+          player = player; 
+        }, gameConfig.combat?.visualEffectDuration || 1000);
       } else {
         addLog(t('flaskEmpty', t('mp')), 'info');
       }
@@ -90,12 +96,12 @@
     // --- Dev Mode 狀態反應 ---
     // 當 devMode 改變時，動態調整玩家的 HP/MP 上限
     $: if (devMode) {
-      player.maxHp = 1000;
-      player.maxMp = 1000;
+      player.maxHp = gameConfig.devmode?.playerInitialHp || 1000;
+      player.maxMp = gameConfig.devmode?.playerInitialMp || 1000;
       player = player;
     } else if (isLoaded) {
-      player.maxHp = gameConfig.playerInitialHp || 100;
-      player.maxMp = gameConfig.playerInitialMp || 50;
+      player.maxHp = gameConfig.player?.initialHp || 100;
+      player.maxMp = gameConfig.player?.initialMp || 50;
       player.hp = Math.min(player.hp, player.maxHp);
       player.mp = Math.min(player.mp, player.maxMp);
       player = player;
@@ -130,7 +136,7 @@
       }
 
       const newEntry = { segments, id: Date.now() + Math.random() };
-      logHistory = [...logHistory, newEntry].slice(-50);
+      logHistory = [...logHistory, newEntry].slice(-(gameConfig.system?.maxLogEntries || 50));
     }
     
     let player = {
@@ -314,15 +320,15 @@
       await loadAllDictionaries();
       
       // 初始化 devMode
-      devMode = gameConfig.initialDevMode;
+      devMode = gameConfig.devmode?.enabled ?? false;
 
       // 使用 gameConfig 初始化玩家狀態
-      player.hp = devMode ? 1000 : gameConfig.playerInitialHp;
-      player.maxHp = devMode ? 1000 : gameConfig.playerInitialHp;
-      player.mp = devMode ? 1000 : gameConfig.playerInitialMp;
-      player.maxMp = devMode ? 1000 : gameConfig.playerInitialMp;
-      player.speed = gameConfig.playerSpeed; // 從 config 載入玩家速度
-      burstMaxTime = gameConfig.burstMaxTime; // 初始化 burstMaxTime
+      player.hp = devMode ? (gameConfig.devmode?.playerInitialHp || 1000) : (gameConfig.player?.initialHp || 100);
+      player.maxHp = devMode ? (gameConfig.devmode?.playerInitialHp || 1000) : (gameConfig.player?.initialHp || 100);
+      player.mp = devMode ? (gameConfig.devmode?.playerInitialMp || 1000) : (gameConfig.player?.initialMp || 50);
+      player.maxMp = devMode ? (gameConfig.devmode?.playerInitialMp || 1000) : (gameConfig.player?.initialMp || 50);
+      player.speed = gameConfig.player?.speed || 0.8;
+      burstMaxTime = gameConfig.burstMode?.maxTime || 5000;
       player = player; // 強制觸發 player 物件的反應性更新
       spawnMonsters();
       const timer = setInterval(() => {
@@ -340,7 +346,7 @@
       try {
         const tiers = ['white', 'magic', 'rare', 'unique'];
         const fetchPromises = tiers.map(tier => {
-          const path = gameConfig.wordDictionaries[tier]; // 從 gameConfig 讀取檔案路徑
+          const path = gameConfig.enemies?.wordDictionaries[tier];
           return fetch(path).then(res => {
             if (!res.ok) {
               throw new Error(`File not found: ${path} (HTTP ${res.status}). Please ensure the file exists in public/data/`);
@@ -408,14 +414,14 @@
       const randomWord = pool[Math.floor(Math.random() * pool.length)];
 
       const allAffixes = monsterDb ? [...monsterDb.affixes.prefixes, ...monsterDb.affixes.suffixes] : [];
-      const tierConfig = gameConfig.monsterTiers ? gameConfig.monsterTiers[tier] : null;
+      const tierConfig = gameConfig.enemies?.tiers ? gameConfig.enemies.tiers[tier] : null;
       let name_en = tier.toUpperCase(), name_zh = tier.toUpperCase(), icon = tierConfig?.icon || '❓', nameParts = null;
 
       if (monsterDb) {
         const race = monsterDb.races[Math.floor(Math.random() * monsterDb.races.length)];
         const basePool = monsterDb.monster_base_names[race.id];
         const base = basePool[Math.floor(Math.random() * basePool.length)];
-        let affixCount = gameConfig.monsterTiers[tier].affixCount; // 從 config 讀取詞綴數量
+        let affixCount = tierConfig?.affixCount || 0; // 從 config 讀取詞綴數量
         const pickedAffixes = [...allAffixes].sort(() => 0.5 - Math.random()).slice(0, affixCount);
         
         const prefixEn = pickedAffixes.map(a => a.en).join(' ');
@@ -434,7 +440,7 @@
       return {
         id, name_en, name_zh, word: randomWord, icon,
         hp: tierConfig?.hp || 100, maxHp: tierConfig?.hp || 100,
-        mp: gameConfig.monsterInitialMp || 0, maxMp: gameConfig.monsterInitialMp || 0,
+        mp: gameConfig.enemies?.initialMp || 0, maxMp: gameConfig.enemies?.initialMp || 0,
         atb: Math.random() * 30, speed: tierConfig?.speed || 0.5,
         wordType: tier, isAttacking: false, isTargetSuccess: false, lastDamage: 0,
         nameParts: nameParts || { race: {en:'', zh:''}, affixes: {en:'', zh:''}, base: {en:tier.toUpperCase(), zh:tier.toUpperCase()} }
@@ -446,7 +452,7 @@
         enemies = [generateMonster(1, 'unique')];
       } else { // 確保場上怪物數量不超過最大值
         const currentEnemyCount = enemies.filter(e => e.hp > 0).length;
-        const maxSlots = 9; // 3x3 網格總數
+        const maxSlots = gameConfig.enemies?.maxEnemies || 9;
         const enemiesToSpawn = maxSlots - currentEnemyCount;
         for (let i = 0; i < enemiesToSpawn; i++) {
           const newId = Math.max(...enemies.map(e => e.id), 0) + 1; // 確保 ID 唯一
@@ -459,9 +465,10 @@
       // Dev Mode 每 5 秒回復 100 點 HP/MP
       if (devMode && gameState !== 'PAUSED' && gameState !== 'GAME_OVER') {
         devRegenCounter++;
-        if (devRegenCounter >= 100) { // 100 ticks * 50ms = 5000ms (5秒)
+        const regenInterval = gameConfig.devmode?.regenIntervalTicks || 100;
+        if (devRegenCounter >= regenInterval) {
           devRegenCounter = 0;
-          const regenAmount = 100;
+          const regenAmount = gameConfig.devmode?.regenAmount || 100;
           player.hp = Math.min(player.maxHp, player.hp + regenAmount);
           player.mp = Math.min(player.maxMp, player.mp + regenAmount);
           player.lastHeal = regenAmount;
@@ -472,13 +479,14 @@
             player.lastHeal = 0;
             player.lastMpRegen = 0;
             player = player;
-          }, 1000);
+          }, gameConfig.combat?.visualEffectDuration || 1000);
         }
       }
 
       // 玩家 ATB
       if (player.atb < 100) {
-        const chargeSpeed = devMode ? player.speed * 5 : player.speed;
+        const atbMultiplier = gameConfig.devmode?.atbSpeedMultiplier || 5;
+        const chargeSpeed = devMode ? player.speed * atbMultiplier : player.speed;
         player.atb += chargeSpeed;
         if (player.atb >= 100) {
           player.atb = 100;
@@ -498,7 +506,7 @@
     }
   
     function enemyAttack(attacker) {
-      const damage = gameConfig.enemyBaseDamage;
+      const damage = gameConfig.combat?.enemyBaseDamage || 10;
       // 根據當前語言選擇名稱
       const currentName = attacker[`name_${currentLanguage}`] || attacker.name_en;
 
@@ -518,7 +526,7 @@
         player.lastDamage = 0;
         enemies = enemies;
         player = player;
-      }, 1000); // 延長時間讓傷害數值顯示
+      }, gameConfig.combat?.visualEffectDuration || 1000);
 
       attacker.atb = 0;
       addLog(t('enemyAttackLog', currentName, damage), attacker.wordType, currentName);
@@ -543,11 +551,11 @@
       isBossMode = false;
       enemies = []; // 清空現有怪物，防止 ID 累加與排版錯誤
       player = {
-        hp: devMode ? 1000 : gameConfig.playerInitialHp,
-        maxHp: devMode ? 1000 : gameConfig.playerInitialHp,
-        mp: devMode ? 1000 : gameConfig.playerInitialMp,
-        maxMp: devMode ? 1000 : gameConfig.playerInitialMp,
-        atb: 0, speed: gameConfig.playerSpeed, isHit: false, // 使用 config 中的速度
+        hp: devMode ? (gameConfig.devmode?.playerInitialHp || 1000) : gameConfig.player?.initialHp,
+        maxHp: devMode ? (gameConfig.devmode?.playerInitialHp || 1000) : gameConfig.player?.initialHp,
+        mp: devMode ? (gameConfig.devmode?.playerInitialMp || 1000) : gameConfig.player?.initialMp,
+        maxMp: devMode ? (gameConfig.devmode?.playerInitialMp || 1000) : gameConfig.player?.initialMp,
+        atb: 0, speed: gameConfig.player?.speed || 0.8, isHit: false,
         isAttacking: false,
         selectedAction: null,
         lastDamage: 0,
@@ -577,32 +585,38 @@
 
     // --- 鍵盤監聽 ---
     function handleGlobalKeyDown(e) {
+      const keys = gameConfig.hotkeys;
+      if (!keys) return;
+
+      const pressedKey = e.key;
+      const upperKey = e.key.toUpperCase();
+
       // 切換日誌 (熱鍵 0)
-      if (e.key === '0') {
+      if (pressedKey === keys.toggleLog) {
         showLog = !showLog;
         return;
       }
 
       // 切換技能視窗 (熱鍵 9)
-      if (e.key === '9') {
+      if (pressedKey === keys.toggleSkills) {
         showSkillsWindow = !showSkillsWindow;
         return;
       }
 
       // 藥水熱鍵 (1/2)
-      if (e.key === '1') {
+      if (pressedKey === keys.hpFlask) {
         e.preventDefault();
         useHpFlask();
         return;
       }
-      if (e.key === '2') {
+      if (pressedKey === keys.mpFlask) {
         e.preventDefault();
         useMpFlask();
         return;
       }
 
       // 切換幫助 (熱鍵 ?)
-      if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+      if (pressedKey === keys.toggleHelp || (pressedKey === '/' && e.shiftKey && keys.toggleHelp === '?')) {
         showHelp = !showHelp;
         if (showHelp && gameState !== 'PAUSED') {
           previousState = gameState;
@@ -613,15 +627,15 @@
         return;
       }
 
-      if (e.key === 'Escape') {
+      if (pressedKey === keys.pause) {
         togglePause();
         return;
       }
 
       // 在 BURST 模式下，按 Tab 鍵循環切換技能
-        if (gameState === 'BURST' && e.key === 'Tab') {
+      if (gameState === 'BURST' && pressedKey === keys.burstSkillCycle) {
         e.preventDefault();
-        const skillKeys = ['Q', 'W', 'E', 'R', 'T'];
+        const skillKeys = keys.skillSlots || [];
         let currentIndex = skillKeys.indexOf(activeBurstKey);
         
         // 尋找下一個有裝備技能的欄位
@@ -641,19 +655,18 @@
       if (gameState === 'PAUSED' || gameState === 'GAME_OVER') return;
 
       if (gameState === 'ACTION_SELECT') {
-        const key = e.key.toUpperCase();
         const aliveEnemies = enemies.filter(e => e.hp > 0);
 
-        // 處理選擇移動 (h/l 或 左右方向鍵)
+        // 處理 3x3 網格目標選擇
         if (aliveEnemies.length > 0) {
-          if (key === 'H' || key === 'ARROWLEFT') {
+          if (keys.moveLeft?.includes(upperKey)) {
             e.preventDefault();
             const currentIndex = aliveEnemies.findIndex(m => m.id === selectedMonsterId);
             const newIndex = (currentIndex - 1 + aliveEnemies.length) % aliveEnemies.length;
             selectedMonsterId = aliveEnemies[newIndex].id;
             return;
           }
-          if (key === 'L' || key === 'ARROWRIGHT') {
+          if (keys.moveRight?.includes(upperKey)) {
             e.preventDefault();
             const currentIndex = aliveEnemies.findIndex(m => m.id === selectedMonsterId);
             const newIndex = (currentIndex + 1) % aliveEnemies.length;
@@ -665,7 +678,7 @@
           // 根據 3x3 網格：索引 -3 是上移，索引 +3 是下移
           const fullIndex = enemies.findIndex(m => m.id === selectedMonsterId);
           
-          if (key === 'K' || key === 'ARROWUP') { // 依照要求：K 為上移
+          if (keys.moveUp?.includes(upperKey)) {
             e.preventDefault();
             // 往上搜尋同欄位中活著的怪物
             for (let i = fullIndex - 3; i >= 0; i -= 3) {
@@ -677,7 +690,7 @@
             return;
           }
           
-          if (key === 'J' || key === 'ARROWDOWN') { // 依照要求：J 為下移
+          if (keys.moveDown?.includes(upperKey)) {
             e.preventDefault();
             // 往下搜尋同欄位中活著的怪物
             for (let i = fullIndex + 3; i < enemies.length; i += 3) {
@@ -690,20 +703,19 @@
           }
         }
 
-        // 更新為新的技能熱鍵映射 Q, W, E, R, T
-        if (['Q', 'W', 'E', 'R', 'T'].includes(key)) {
-          // 根據是否有裝備技能決定動作類型：有技能則為 S (需消耗MP)，無則為 A
-          const equipped = equippedSkills[key];
+        // 處理技能與攻擊觸發
+        if (keys.skillSlots?.includes(upperKey)) {
+          const equipped = equippedSkills[upperKey];
           let actionKey = equipped ? 'S' : 'A';
 
-          const skillCost = gameConfig.skillMpCost || 30;
+          const skillCost = gameConfig.combat?.skillMpCost || 30;
           if (actionKey === 'S' && player.mp < skillCost) {
             addLog(t('mpNotEnough', skillCost), 'info');
             return;
           }
           e.preventDefault();
           player.selectedAction = actionKey;
-          activeBurstKey = key; // 記錄觸發 Burst 的按鍵
+          activeBurstKey = upperKey; // 記錄觸發 Burst 的按鍵
 
           if (actionKey === 'A' || actionKey === 'S') {
             const target = aliveEnemies.find(m => m.id === selectedMonsterId);
@@ -722,7 +734,7 @@
                 target.isTargetSuccess = false;
                 enemies = enemies;
                 startBurst();
-              }, 200);
+              }, gameConfig.combat?.actionExecutionDelay || 200);
             }
           } else {
             executeQuickAction(actionKey);
@@ -751,7 +763,7 @@
       currentWordInput = "";
       currentWordIndex = 0;
       visibleWordsStartIndex = 0;
-      burstTimeLeft = gameConfig.burstMaxTime;
+      burstTimeLeft = gameConfig.burstMode?.maxTime || 5000;
       generateBurstWords();
       
       burstInterval = setInterval(() => {
@@ -792,10 +804,10 @@
     function handleCorrectWord() {
         // 更新連擊數顯示
         // --- 每次成功連擊都增加時間 ---
-        const bonusTime = gameConfig.comboBonusTime;
-        burstTimeLeft = Math.min(gameConfig.burstMaxTime, burstTimeLeft + bonusTime);
+        const bonusTime = gameConfig.burstMode?.correctWordBonus || 1500;
+        burstTimeLeft = Math.min(gameConfig.burstMode?.maxTime || 5000, burstTimeLeft + bonusTime);
         burstBonusText = `+${(bonusTime / 1000).toFixed(1)}s`;
-        setTimeout(() => { burstBonusText = ""; }, 800);
+        setTimeout(() => { burstBonusText = ""; }, gameConfig.burstMode?.bonusTextDuration || 800);
         // --- 每次成功連擊都增加時間 ---
 
         currentComboDisplayCount = comboCount + 1; // comboCount 還沒加，所以這裡加1
@@ -810,15 +822,18 @@
         setTimeout(() => {
           player.isAttacking = false;
           player = player;
-        }, 200);
+        }, gameConfig.combat?.actionExecutionDelay || 200);
 
         // 立即計算傷害數值，以便後續視覺特效與傷害套用使用
         const currentSkill = equippedSkills[activeBurstKey];
         const hitType = currentSkill?.type || 'normal';
 
-        let multiplier = player.selectedAction === 'S' ? (currentSkill?.atk_multiplier || 2) : 1;
-        if (devMode) multiplier *= 10; // Dev 模式傷害加成
-        const damagePerWord = gameConfig.baseDamagePerWord * multiplier;
+        // 修正：技能屬性名稱應為 atk (來自 skills.json)，並將其轉為倍率 (例如 140 轉為 1.4)
+        let multiplier = player.selectedAction === 'S' ? (currentSkill?.atk ? currentSkill.atk / 100 : 2) : 1;
+        const dmgMultiplier = gameConfig.devmode?.damageMultiplier || 10;
+        if (devMode) multiplier *= dmgMultiplier;
+        // 修正：增加括號確保先取得基礎傷害再進行倍率乘法
+        const damagePerWord = (gameConfig.combat?.baseDamagePerWord || 20) * multiplier;
 
         // 觸發視覺特效
         currentTarget.isHit = true;
@@ -829,8 +844,8 @@
           hitTarget.isHit = false;
           hitTarget.lastHitType = null; // 結束特效時清除屬性標記
           hitTarget.lastDamage = 0;
-          enemies = enemies; // 確保狀態清除後能更新 UI
-        }, 1000);
+          enemies = enemies;
+        }, gameConfig.combat?.visualEffectDuration || 1000);
 
         // 套用傷害
         currentTarget.hp = Math.max(0, currentTarget.hp - damagePerWord);
@@ -838,7 +853,9 @@
 
         if (currentTarget.hp <= 0) {
           // 分數邏輯
-          const scoreMap = gameConfig.scoreMap;
+          const scoreMap = (devMode && gameConfig.devmode?.scoreMap)
+            ? gameConfig.devmode.scoreMap
+            : gameConfig.enemies?.scoreMap;
           const points = scoreMap[currentTarget.wordType] || 0;
           gameScore = Math.min(100, gameScore + points);
 
@@ -862,7 +879,7 @@
               selectedMonsterId = enemies[0].id;
               isBossApproaching = false;
               addLog("--- BOSS ROOM ---", 'unique');
-            }, 2000); // 延長轉場時間
+            }, gameConfig.enemies?.bossSpawnDelay || 2000);
           }
           // 擊敗 Boss 結算邏輯 (檢查是否真的擊敗了 Unique 階級的 Boss)
           else if (currentTarget.wordType === 'unique') {
@@ -886,7 +903,7 @@
                 enemies[idx] = generateMonster(deadId, getRandomTier()); // 在原位重生
                 enemies = enemies;
               }
-            }, 1000);
+            }, gameConfig.enemies?.respawnDelay || 1000);
           }
 
           const aliveEnemies = enemies.filter(e => e.hp > 0);
@@ -906,9 +923,11 @@
     function moveToNextWord() {
       currentWordIndex++;
       checkScroll();
-      // 提高緩衝閾值（剩餘 30 個即補貨）並增加補貨量 (60 個)，確保流暢度
-      if (currentBurstWords.length - currentWordIndex < 30) {
-        addBurstWords(60);
+      const threshold = gameConfig.typingConfig?.refillThreshold || 30;
+      const amount = gameConfig.typingConfig?.refillAmount || 60;
+      
+      if (currentBurstWords.length - currentWordIndex < threshold) {
+        addBurstWords(amount);
       }
     }
 
@@ -980,12 +999,12 @@
           onRestart={restartGame}
           {finalResults}
           {showLog}
-          {showHelp}
+          {showHelp} hotkeys={gameConfig.hotkeys || {}}
           onToggleLog={() => showLog = !showLog}
           onToggleHelp={() => showHelp = !showHelp}
         />
 
-        <BattleScene {enemies} {player} {gameState} {selectedMonsterId} {t} {currentLanguage} {showComboDisplay} {currentComboDisplayCount} {currentWpm} {isBossApproaching} {gameScore} {useHpFlask} {useMpFlask} {equippedSkills} {activeBurstKey} onDropSkill={handleAssignSkill} onRemoveSkill={handleRemoveSkill} onOpenSkills={(slotKey) => { showSkillsWindow = true; lastClickedSkillSlotKey = slotKey; }} />
+        <BattleScene {enemies} {player} {gameState} {selectedMonsterId} {t} {currentLanguage} {showComboDisplay} {currentComboDisplayCount} {currentWpm} {isBossApproaching} {gameScore} {useHpFlask} {useMpFlask} {equippedSkills} {activeBurstKey} hotkeys={gameConfig.hotkeys || {}} onDropSkill={handleAssignSkill} onRemoveSkill={handleRemoveSkill} onOpenSkills={(slotKey) => { showSkillsWindow = true; lastClickedSkillSlotKey = slotKey; }} />
 
         <UIPanel 
           {gameState} {t} 
@@ -1001,7 +1020,7 @@
     </main>
 
     {#if showSkillsWindow}
-      <SkillSidebar {skillDb} {equippedSkills} {currentLanguage} {lastClickedSkillSlotKey} onDropSkill={handleAssignSkill} onRemoveSkill={handleRemoveSkill} onToggleSkills={onToggleSkills} onSelectSlot={(key) => lastClickedSkillSlotKey = key} />
+      <SkillSidebar {skillDb} {equippedSkills} {currentLanguage} {lastClickedSkillSlotKey} skillSlots={gameConfig.hotkeys?.skillSlots || []} hotkeys={gameConfig.hotkeys || {}} onDropSkill={handleAssignSkill} onRemoveSkill={handleRemoveSkill} onToggleSkills={onToggleSkills} onSelectSlot={(key) => lastClickedSkillSlotKey = key} />
     {/if}
   </div>
   

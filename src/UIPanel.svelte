@@ -17,6 +17,10 @@
   export let comboCount;
 
   let inputEl;
+  let wordElements = []; // 用於儲存所有單字元素的引用
+
+  // 動態計算捲動偏移量：根據當前單字在容器中的頂部偏移 (offsetTop)
+  $: scrollY = wordElements[currentWordIndex] ? wordElements[currentWordIndex].offsetTop : 0;
 
   // 當進入 BURST 模式或更新時，強制聚焦輸入框
   afterUpdate(() => {
@@ -49,13 +53,14 @@
             <span class="bonus-hint">{burstBonusText}</span>
           {/if}
         </div>
-        <div class="word-display-container" style="--lines-to-display: {linesToDisplay}; --line-height-val: 1.3em; --row-gap: 0.3em;">
-          <div class="word-lines" style="transform: translateY(calc(-1 * (var(--line-height-val) + var(--row-gap)) * {Math.floor(currentWordIndex / wordsPerLine)}))">
+        <div class="word-display-container" style="--lines-to-display: {linesToDisplay}; --line-height-val: 1.3em; --row-gap: 0.3em; --words-per-line: {wordsPerLine};">
+          <div class="word-lines" style="transform: translateY(-{scrollY}px)">
             {#each currentBurstWords as word, i (i)}
               <span class="word-item" 
                 class:typed={i < currentWordIndex}
                 class:current={i === currentWordIndex}
                 class:pending={i > currentWordIndex}
+                bind:this={wordElements[i]}
               >
                 {#if i === currentWordIndex}
                   {#each word.split('') as char, charIndex (charIndex)}
@@ -70,9 +75,6 @@
                   {/if}
                 {:else}
                   {word}
-                {/if}
-                {#if i < currentBurstWords.length - 1 && (i + 1) % wordsPerLine !== 0}
-                  <span class="word-space"> </span>
                 {/if}
               </span>
             {/each}
@@ -179,12 +181,18 @@
     transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
     display: flex;
     flex-wrap: wrap;
-    gap: var(--row-gap) 0.6em;
+    gap: var(--row-gap) 0.6em; /* 使用字距間隙，符合 Monkeytype 習慣 */
+    width: 100%;
     will-change: transform;
   }
   .word-item { 
+    width: auto; /* 恢復自然寬度 */
+    box-sizing: border-box;
+    text-align: left;
+    white-space: nowrap;
+    line-height: var(--line-height-val);
     color: #666; 
-    display: inline-flex;
+    display: flex;
     align-items: center;
   }
   .word-item.typed { color: #fff; }

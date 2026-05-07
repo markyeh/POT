@@ -18,6 +18,7 @@
   export let onRemoveSkill;
   export let onOpenSkills;
   export let activeBurstKey = null; // 接收當前使用的按鍵
+  export let hotkeys = {}; // 接收熱鍵設定以顯示標籤
 
   // 計算當前選中怪物的索引，用於定位選擇框
   $: selectedIndex = enemies.findIndex(e => e.id === selectedMonsterId);
@@ -148,20 +149,20 @@
                 <div class="flask-fill" style="height: {(player.hpFlask.currentCharges / (player.hpFlask.maxCharges || 1)) * 100}%"></div>
                 <span class="flask-charges">{player.hpFlask.currentCharges}</span>
               {/if}
-              <span class="flask-key">1</span>
+              <span class="flask-key">{hotkeys.hpFlask || '1'}</span>
             </div>
             <div class="flask-slot mp-flask" on:click={useMpFlask}>
               {#if player.mpFlask}
                 <div class="flask-fill" style="height: {(player.mpFlask.currentCharges / (player.mpFlask.maxCharges || 1)) * 100}%"></div>
                 <span class="flask-charges">{player.mpFlask.currentCharges}</span>
               {/if}
-              <span class="flask-key">2</span>
+              <span class="flask-key">{hotkeys.mpFlask || '2'}</span>
             </div>
           </div>
           
           <!-- 技能欄位 -->
           <div class="skill-slots">
-            {#each ['Q', 'W', 'E', 'R', 'T'] as key, i}
+            {#each (hotkeys.skillSlots || ['Q', 'W', 'E', 'R', 'T']) as key, i}
               <div 
                 class="skill-slot" 
                 class:active={gameState === 'ACTION_SELECT'}

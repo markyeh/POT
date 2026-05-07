@@ -1,46 +1,85 @@
 {
-  "comboBonusTime": 1500,
-  "burstMaxTime": 5000,
-  "baseDamagePerWord": 20,
-  "enemyBaseDamage": 10,
-  "playerInitialHp": 100,
-  "playerInitialMp": 50,
-  "monsterInitialMp": 50,
-  "playerSpeed": 0.8,
-  "initialDevMode": true,
-  "skillMpCost": 30,
-  "monsterTiers": {
-    "white":  { "hp": 60,  "speed": 0.3, "icon": "👻", "affixCount": 0 },
-    "magic":  { "hp": 120, "speed": 0.5, "icon": "🔮", "affixCount": 2 },
-    "rare":   { "hp": 250, "speed": 0.7, "icon": "💎", "affixCount": 4 },
-    "unique": { "hp": 1000, "speed": 1.0, "icon": "👑", "affixCount": 6 }
+  "combat": {
+    "baseDamagePerWord": 20,
+    "enemyBaseDamage": 10,
+    "skillMpCost": 30,
+    "actionExecutionDelay": 200,
+    "visualEffectDuration": 1000
   },
-  "scoreMap": {
-    "white": 10,
-    "magic": 30,
-    "rare": 60,
-    "unique": 0
+  "burstMode": {
+    "correctWordBonus": 1500,
+    "maxTime": 5000,
+    "bonusTextDuration": 800
   },
-  "maxEnemies": 4,
-  "enemyRespawnDelay": 1000,
-  "wordDictionaries": {
-    "white": "data/monkeytype_english.json",
-    "magic": "data/monkeytype_english.json",
-    "rare": "data/monkeytype_english.json",
-    "unique": "data/monkeytype_english.json"
+  "player": {
+    "initialHp": 100,
+    "initialMp": 50,
+    "speed": 0.8
+  },
+  "enemies": {
+    "initialMp": 50,
+    "maxEnemies": 9,
+    "respawnDelay": 1000,
+    "bossSpawnDelay": 2000,
+    "tiers": {
+      "white":  { "hp": 60,  "speed": 0.3, "icon": "👻", "affixCount": 0 },
+      "magic":  { "hp": 120, "speed": 0.5, "icon": "🔮", "affixCount": 2 },
+      "rare":   { "hp": 250, "speed": 0.7, "icon": "💎", "affixCount": 4 },
+      "unique": { "hp": 1000, "speed": 1.0, "icon": "👑", "affixCount": 6 }
+    },
+    "scoreMap": {
+      "white": 1, "magic": 3, "rare": 6, "unique": 0
+    },
+    "wordDictionaries": {
+      "white": "data/monkeytype_english.json",
+      "magic": "data/monkeytype_english.json",
+      "rare": "data/monkeytype_english.json",
+      "unique": "data/monkeytype_english.json"
+    }
   },
   "flaskConfig": {
     "hpFlaskMaxCharges": 3,
-    "hpFlaskChargeCost": 1,
     "hpFlaskRestoreAmount": 50,
     "mpFlaskMaxCharges": 3,
-    "mpFlaskChargeCost": 1,
-    "mpFlaskRestoreAmount": 50,
-    "chargesPerKill": 1
+    "mpFlaskRestoreAmount": 50
   },
   "typingConfig": {
-    "wordsPerLine": 12,
-    "linesToDisplay": 2,
-    "initialWordPoolSize": 50
+    "wordsPerLine": 8,
+    "linesToDisplay": 3,
+    "initialWordPoolSize": 50,
+    "refillThreshold": 30,
+    "refillAmount": 60
+  },
+  "system": {
+    "maxLogEntries": 50
+  },
+  "hotkeys": {
+    "toggleLog": "0",
+    "toggleSkills": "9",
+    "hpFlask": "1",
+    "mpFlask": "2",
+    "toggleHelp": "?",
+    "pause": "Escape",
+    "burstSkillCycle": "Tab",
+    "moveLeft": ["H", "ARROWLEFT"],
+    "moveRight": ["L", "ARROWRIGHT"],
+    "moveUp": ["K", "ARROWUP"],
+    "moveDown": ["J", "ARROWDOWN"],
+    "skillSlots": ["Q", "W", "E", "R", "T"]
+  },
+  "devmode": {
+    "enabled": true,
+    "playerInitialHp": 1000,
+    "playerInitialMp": 1000,
+    "regenIntervalTicks": 100,
+    "regenAmount": 100,
+    "atbSpeedMultiplier": 5,
+    "damageMultiplier": 10,
+    "scoreMap": {
+      "white": 1,
+      "magic": 3,
+      "rare": 6,
+      "unique": 0
+    }
   }
 }
