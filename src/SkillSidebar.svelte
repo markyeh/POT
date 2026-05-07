@@ -3,6 +3,9 @@
   export let equippedSkills;
   export let onDropSkill;
   export let onRemoveSkill;
+  export let onToggleSkills; // 用於關閉視窗
+  export let lastClickedSkillSlotKey; // 接收最後點擊的技能欄位
+  export let onSelectSlot; // 用於切換選中的欄位
   export let currentLanguage;
 
   // Define the keys for visual representation
@@ -27,7 +30,10 @@
 </script>
 
 <div class="skill-sidebar">
-  <div class="sidebar-header">SKILLS REPOSITORY</div>
+  <div class="sidebar-header">
+    SKILLS REPOSITORY
+    <button class="close-x-btn" on:click={onToggleSkills} title="Close [9]">×</button>
+  </div>
   
   <div class="equipped-section">
     <div class="section-title">CURRENT LOADOUT</div>
@@ -39,6 +45,8 @@
             const skillData = JSON.parse(e.dataTransfer.getData('skill'));
             onDropSkill(key, skillData);
           }}
+          on:click={() => onSelectSlot(key)}
+          class:target-slot={lastClickedSkillSlotKey === key}
           on:contextmenu|preventDefault={() => onRemoveSkill(key)}
           on:mouseenter={(e) => showTooltip(equippedSkills[key], e)}
           on:mousemove={moveTooltip}
@@ -70,6 +78,11 @@
                   draggable="true"
                   on:dragstart={(e) => {
                     e.dataTransfer.setData('skill', JSON.stringify(skill));
+                  }}
+                  on:click={() => {
+                    if (lastClickedSkillSlotKey) {
+                      onDropSkill(lastClickedSkillSlotKey, skill);
+                    }
                   }}
                   on:mouseenter={(e) => showTooltip(skill, e)}
                   on:mousemove={moveTooltip}
@@ -120,14 +133,29 @@
     box-sizing: border-box;
     overflow: hidden; /* 確保內容不會溢出邊框 */
   }
-  .sidebar-header { font-size: 0.9rem; font-weight: bold; border-bottom: 1px solid #fff; padding-bottom: 5px; color: #f1c40f; text-align: center; }
+  .sidebar-header { 
+    font-size: 0.9rem; font-weight: bold; border-bottom: 1px solid #fff; 
+    padding-bottom: 5px; color: #f1c40f; text-align: center; 
+    display: flex; justify-content: center; align-items: center; position: relative;
+  }
+  .close-x-btn {
+    position: absolute; right: 0; top: -5px; background: none; border: none;
+    color: #fff; font-size: 1.5rem; cursor: pointer; line-height: 1;
+    padding: 0 5px;
+  }
+  .close-x-btn:hover { color: #f1c40f; }
+
   .section-title { font-size: 0.7rem; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
   
   .loadout-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
-  .loadout-slot { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .loadout-slot { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
   .slot-info { display: flex; justify-content: space-between; width: 100%; font-size: 0.5rem; color: #f1c40f; }
   .slot-box { width: 40px; height: 40px; border: 1px dashed #444; background: #111; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
-  .slot-box.has-skill { border: 1px solid #fff; box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.2); }
+  .slot-box.has-skill { border: 1px solid #fff; box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.2); } /* 裝備中的技能框 */
+  .loadout-slot.target-slot .slot-box { /* 被點擊的目標技能框 */
+    border: 2px solid #3498db;
+    box-shadow: 0 0 10px rgba(52, 152, 219, 0.5), inset 0 0 8px rgba(52, 152, 219, 0.3);
+  }
 
   .repo-section { 
     flex: 1; 

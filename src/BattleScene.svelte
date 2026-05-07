@@ -158,7 +158,10 @@
               class="skill-slot" 
               class:active={gameState === 'ACTION_SELECT'}
               class:using={gameState === 'BURST' && activeBurstKey === key}
-              on:click={onOpenSkills}
+              class:prompt-white={!equippedSkills[key]}
+              class:prompt-yellow={gameState === 'ACTION_SELECT' && equippedSkills[key]}
+              class:insufficient-mp={equippedSkills[key] && equippedSkills[key].mp && player.mp < equippedSkills[key].mp}
+              on:click={() => onOpenSkills(key)}
               on:contextmenu|preventDefault={() => onRemoveSkill(key)}
               on:mouseenter={(e) => showTooltip(equippedSkills[key], e)}
               on:mousemove={moveTooltip}
@@ -459,6 +462,48 @@
   .skill-slot .key { position: absolute; top: 2px; left: 3px; font-size: 0.6rem; color: #f1c40f; font-weight: bold; }
   .skill-slot .slot-index { position: absolute; top: 2px; right: 3px; font-size: 0.5rem; color: #888; }
   .skill-slot .label { font-size: 1.2rem; color: #fff; margin-top: 5px; }
+
+  /* ATB滿且未設定技能時的白色閃爍方框 */
+  .skill-slot.prompt-white {
+    border: 2px solid #fff !important;
+    animation: white-flash-box 1s infinite ease-in-out !important;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.05) !important;
+  }
+
+  /* ATB滿且已設定技能時的黃色閃爍方框 */
+  .skill-slot.prompt-yellow {
+    border: 2px solid #e0ce86 !important;
+    animation: yellow-flash-box 1s infinite ease-in-out !important;
+    z-index: 10;
+    background: rgba(241, 196, 15, 0.1) !important;
+  }
+
+  @keyframes white-flash-box {
+    0%, 100% { border-color: #fff; box-shadow: 0 0 12px rgba(255, 255, 255, 0.4); }
+    50% { border-color: #666; box-shadow: 0 0 2px transparent; }
+  }
+
+  @keyframes yellow-flash-box {
+    0%, 100% { border-color: #f1c40f; box-shadow: 0 0 12px rgba(241, 196, 15, 0.5), inset 0 0 5px rgba(241, 196, 15, 0.3); }
+    50% { border-color: #8a6d3b; box-shadow: 0 0 2px transparent; }
+  }
+
+  /* MP 不足的禁用特效 */
+  .skill-slot.insufficient-mp {
+    filter: grayscale(0.8) brightness(0.4);
+    position: relative;
+  }
+  .skill-slot.insufficient-mp::before {
+    content: "✕";
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgba(255, 0, 0, 0.5);
+    font-size: 2rem;
+    z-index: 5;
+    pointer-events: none;
+  }
 
   .skill-tooltip {
     position: fixed;

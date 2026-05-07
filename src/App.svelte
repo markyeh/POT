@@ -29,6 +29,7 @@
     let logContainer; // 用於控制捲動
     let activeBurstKey = null; // 追蹤當前正在使用的技能按鍵
     let skillDb = null; // 技能數據庫
+    let lastClickedSkillSlotKey = null; // 追蹤最後點擊的技能欄位
     let equippedSkills = { // 裝備中的技能映射
       Q: null,
       W: null,
@@ -79,6 +80,11 @@
       equippedSkills[slot] = skillData;
       equippedSkills = equippedSkills; 
       addLog(`Assigned ${skillData.en} to [${slot}]`, 'system');
+    }
+
+    function onToggleSkills() {
+      showSkillsWindow = !showSkillsWindow;
+      if (!showSkillsWindow) lastClickedSkillSlotKey = null; // 關閉視窗時清除選中的欄位
     }
 
     // --- Dev Mode 狀態反應 ---
@@ -171,6 +177,12 @@
     let currentBurstWords = []; 
     let currentWordInput = ""; 
     let currentWordIndex = 0;
+
+    // 自動檢查打字是否正確 (當輸入內容完全符合目標單字時立即生效，不需要空白鍵)
+    $: if (gameState === 'BURST' && currentWordInput.length > 0 && currentBurstWords[currentWordIndex] && currentWordInput.toLowerCase() === currentBurstWords[currentWordIndex].toLowerCase()) {
+      handleCorrectWord();
+    }
+
     let visibleWordsStartIndex = 0;
     let burstTimeLeft = 0;
     let burstBonusText = ""; // 新增：獎勵時間提示文字
@@ -231,7 +243,8 @@
             runAction: "Successfully escaped!",
             combo: "combo",
             flaskUsed: (type) => `${type} Flask used!`,
-            flaskEmpty: (type) => `${type} Flask is empty!`
+            flaskEmpty: (type) => `${type} Flask is empty!`,
+            bossApproachingMessage: "Boss is approaching! Prepare for battle!"
         },
         zh: {
             gameLogInitializing: "正在初始化單字庫...",
@@ -280,7 +293,8 @@
             runAction: "逃跑成功！",
             combo: "連擊",
             flaskUsed: (type) => `${type} 藥水已使用！`,
-            flaskEmpty: (type) => `${type} 藥水已空！`
+            flaskEmpty: (type) => `${type} 藥水已空！`,
+            bossApproachingMessage: "Boss 正在逼近！準備戰鬥！"
         }
     };
 
@@ -665,17 +679,9 @@
             executeQuickAction(actionKey);
           }
         }
-      } else if (gameState === 'BURST') {
-        if (e.key === ' ') {
-          e.preventDefault();
-          // 檢查當前輸入是否匹配目標單字 (去除空白後比對)
-          if (currentWordInput.trim().toLowerCase() === currentBurstWords[currentWordIndex].toLowerCase()) {
-            handleCorrectWord();
-          }
-        }
       }
     }
-  
+
     // --- 動作處理 ---
     function executeQuickAction(action) {
       if (action === 'B') addLog(t('blockAction'), 'info');
@@ -866,14 +872,23 @@
   
     function endBurst() {
       clearInterval(burstInterval);
-      // 根據當前語言選擇名稱
-      const targetName = currentTarget[`name_${currentLanguage}`] || currentTarget.name_en;
       let logText = t('comboEnd', comboCount);
-      
-      if (currentTarget.hp <= 0) {
-        logText += ` ${t('enemyDefeated', targetName)}`;
+      let tier = 'system';
+      let highlight = null;
+
+      if (currentTarget) {
+        tier = currentTarget.wordType;
+        const name = currentTarget[`name_${currentLanguage}`] || currentTarget.name_en;
+        if (currentTarget.hp <= 0) {
+          logText += ` ${t('enemyDefeated', name)}`;
+          highlight = name;
+        }
+      } else if (isBossMode && gameScore >= 100) {
+        logText += ` ${t('bossApproachingMessage')}`;
+        tier = 'unique'; // Boss 轉場訊息使用紫色等級標示
       }
-      addLog(logText, currentTarget.wordType, targetName);
+
+      addLog(logText, tier, highlight);
       showComboDisplay = false; // Burst Mode 真正結束時關閉顯示
       resetTurn();
     }
@@ -921,7 +936,7 @@
           onToggleHelp={() => showHelp = !showHelp}
         />
 
-        <BattleScene {enemies} {player} {gameState} {selectedMonsterId} {t} {currentLanguage} {showComboDisplay} {currentComboDisplayCount} {currentWpm} {isBossApproaching} {gameScore} {useHpFlask} {useMpFlask} {equippedSkills} {activeBurstKey} onDropSkill={handleAssignSkill} onRemoveSkill={handleRemoveSkill} onOpenSkills={() => { showSkillsWindow = !showSkillsWindow; }} />
+        <BattleScene {enemies} {player} {gameState} {selectedMonsterId} {t} {currentLanguage} {showComboDisplay} {currentComboDisplayCount} {currentWpm} {isBossApproaching} {gameScore} {useHpFlask} {useMpFlask} {equippedSkills} {activeBurstKey} onDropSkill={handleAssignSkill} onRemoveSkill={handleRemoveSkill} onOpenSkills={(slotKey) => { showSkillsWindow = true; lastClickedSkillSlotKey = slotKey; }} />
 
         <UIPanel 
           {gameState} {t} 
@@ -937,7 +952,7 @@
     </main>
 
     {#if showSkillsWindow}
-      <SkillSidebar {skillDb} {equippedSkills} {currentLanguage} onDropSkill={handleAssignSkill} onRemoveSkill={handleRemoveSkill} />
+      <SkillSidebar {skillDb} {equippedSkills} {currentLanguage} {lastClickedSkillSlotKey} onDropSkill={handleAssignSkill} onRemoveSkill={handleRemoveSkill} onToggleSkills={onToggleSkills} onSelectSlot={(key) => lastClickedSkillSlotKey = key} />
     {/if}
   </div>
   
