@@ -1,5 +1,7 @@
-# TYPE: Keyboard Adventurer
+# POT: Path of Typing
 
-Welcome to **TYPE**, an adventure game that combines typing speed with RPG combat. 
+As a huge fan of Path of Exile (PoE), I decided to build a typing game inspired by it.
 
-Preview: 
+I hope you have fun playing it!
+
+Preview: https://markyeh.github.io/POT/
