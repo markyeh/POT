@@ -5,6 +5,7 @@
     import BattleScene from './BattleScene.svelte';
     import ModalOverlay from './ModalOverlay.svelte';
     import UIPanel from './UIPanel.svelte';
+    import SkillSidebar from './SkillSidebar.svelte';
   
     // --- 遊戲資料定義 ---
     let gameConfig = {}; // 儲存遊戲配置參數
@@ -17,6 +18,8 @@
     let currentLanguage = 'en'; // 預設語言為英文
     let showLog = false; // 預設關閉日誌
     let gameScore = 0; // 當前地圖進度分數 (0-100)
+    let isBossApproaching = false; // Boss 登場特效狀態
+    let showSkillsWindow = false; // 技能視窗顯示狀態
     let isBossMode = false; // 是否進入 Boss 房
     let showComboDisplay = false; // 控制連擊數顯示 (這是 UI 狀態，非配置)
     let currentComboDisplayCount = 0; // 當前連擊數
@@ -24,11 +27,79 @@
     let devMode = false; // Dev 模式（無敵狀態），從 config 載入，先給個預設值
     let logHistory = []; // 儲存歷史訊息
     let logContainer; // 用於控制捲動
+    let activeBurstKey = null; // 追蹤當前正在使用的技能按鍵
+    let skillDb = null; // 技能數據庫
+    let equippedSkills = { // 裝備中的技能映射
+      Q: null,
+      W: null,
+      E: null,
+      R: null,
+      T: null
+    };
+
+    // --- 藥水邏輯 (提升位置以確保編譯引用安全) ---
+    function useHpFlask() {
+      if (player.hpFlask && player.hpFlask.currentCharges > 0) {
+        player.hpFlask.currentCharges--;
+        const amount = player.hpFlask.restoreAmount;
+        player.hp = Math.min(player.maxHp, player.hp + amount);
+        player.lastHeal = amount;
+        player = player;
+        addLog(t('flaskUsed', t('hp')), 'info');
+        setTimeout(() => { player.lastHeal = 0; player = player; }, 1000);
+      } else {
+        addLog(t('flaskEmpty', t('hp')), 'info');
+      }
+    }
+
+    function useMpFlask() {
+      if (player.mpFlask && player.mpFlask.currentCharges > 0) {
+        player.mpFlask.currentCharges--;
+        const amount = player.mpFlask.restoreAmount;
+        player.mp = Math.min(player.maxMp, player.mp + amount);
+        player.lastMpRegen = amount;
+        player = player;
+        addLog(t('flaskUsed', t('mp')), 'info');
+        setTimeout(() => { player.lastMpRegen = 0; player = player; }, 1000);
+      } else {
+        addLog(t('flaskEmpty', t('mp')), 'info');
+      }
+    }
+
+    // --- 技能處理 ---
+    function handleRemoveSkill(slot) {
+      if (equippedSkills[slot]) {
+        addLog(`Unequipped ${equippedSkills[slot].en} from [${slot}]`, 'system');
+        equippedSkills[slot] = null;
+        equippedSkills = equippedSkills; 
+      }
+    }
+
+    function handleAssignSkill(slot, skillData) {
+      equippedSkills[slot] = skillData;
+      equippedSkills = equippedSkills; 
+      addLog(`Assigned ${skillData.en} to [${slot}]`, 'system');
+    }
+
+    // --- Dev Mode 狀態反應 ---
+    // 當 devMode 改變時，動態調整玩家的 HP/MP 上限
+    $: if (devMode) {
+      player.maxHp = 1000;
+      player.maxMp = 1000;
+      player = player;
+    } else if (isLoaded) {
+      player.maxHp = gameConfig.playerInitialHp || 100;
+      player.maxMp = gameConfig.playerInitialMp || 50;
+      player.hp = Math.min(player.hp, player.maxHp);
+      player.mp = Math.min(player.mp, player.maxMp);
+      player = player;
+    }
 
     let gameStartTime = Date.now();
     let totalSuccessfulWords = 0;
     let finalResults = { time: 0, wpm: 0 };
     let bossTimer = null; // 用於追蹤 Boss 生成的定時器
+    let devRegenCounter = 0; // 新增：Dev Mode 回復計數器
 
     // 修改：支援多片段日誌，實現局部高亮
     function addLog(content, tier = 'system', highlight = null) {
@@ -62,7 +133,11 @@
       atb: 0, speed: 0.8, // 初始值，將在 onMount 中被 gameConfig 覆寫
       isHit: false, isAttacking: false,
       selectedAction: null,
-      lastDamage: 0
+      lastDamage: 0,
+      lastHeal: 0,
+      lastMpRegen: 0,
+      hpFlask: { currentCharges: 3, maxCharges: 3, restoreAmount: 50 },
+      mpFlask: { currentCharges: 3, maxCharges: 3, restoreAmount: 50 }
     };
   
     let enemies = [];
@@ -154,7 +229,9 @@
             skillPlaceholder: "You cast a skill!",
             blockAction: "You entered a defensive stance.",
             runAction: "Successfully escaped!",
-            combo: "combo"
+            combo: "combo",
+            flaskUsed: (type) => `${type} Flask used!`,
+            flaskEmpty: (type) => `${type} Flask is empty!`
         },
         zh: {
             gameLogInitializing: "正在初始化單字庫...",
@@ -201,7 +278,9 @@
             skillPlaceholder: "你施放了一個技能！",
             blockAction: "你進入了防禦狀態。",
             runAction: "逃跑成功！",
-            combo: "連擊"
+            combo: "連擊",
+            flaskUsed: (type) => `${type} 藥水已使用！`,
+            flaskEmpty: (type) => `${type} 藥水已空！`
         }
     };
 
@@ -224,10 +303,10 @@
       devMode = gameConfig.initialDevMode;
 
       // 使用 gameConfig 初始化玩家狀態
-      player.hp = gameConfig.playerInitialHp;
-      player.maxHp = gameConfig.playerInitialHp;
-      player.mp = gameConfig.playerInitialMp;
-      player.maxMp = gameConfig.playerInitialMp;
+      player.hp = devMode ? 1000 : gameConfig.playerInitialHp;
+      player.maxHp = devMode ? 1000 : gameConfig.playerInitialHp;
+      player.mp = devMode ? 1000 : gameConfig.playerInitialMp;
+      player.maxMp = devMode ? 1000 : gameConfig.playerInitialMp;
       player.speed = gameConfig.playerSpeed; // 從 config 載入玩家速度
       burstMaxTime = gameConfig.burstMaxTime; // 初始化 burstMaxTime
       player = player; // 強制觸發 player 物件的反應性更新
@@ -280,6 +359,12 @@
         const monsterRes = await fetch('data/monster_db.json');
         if (monsterRes.ok) {
             monsterDb = await monsterRes.json();
+        }
+
+        // 載入技能數據庫
+        const skillRes = await fetch('data/skills.json');
+        if (skillRes.ok) {
+          skillDb = await skillRes.json();
         }
 
         isLoaded = true;
@@ -356,6 +441,26 @@
     }
   
     function updateATB() {
+      // Dev Mode 每 5 秒回復 100 點 HP/MP
+      if (devMode && gameState !== 'PAUSED' && gameState !== 'GAME_OVER') {
+        devRegenCounter++;
+        if (devRegenCounter >= 100) { // 100 ticks * 50ms = 5000ms (5秒)
+          devRegenCounter = 0;
+          const regenAmount = 100;
+          player.hp = Math.min(player.maxHp, player.hp + regenAmount);
+          player.mp = Math.min(player.maxMp, player.mp + regenAmount);
+          player.lastHeal = regenAmount;
+          player.lastMpRegen = regenAmount;
+          player = player;
+          // 1秒後清除數值顯示旗標
+          setTimeout(() => {
+            player.lastHeal = 0;
+            player.lastMpRegen = 0;
+            player = player;
+          }, 1000);
+        }
+      }
+
       // 玩家 ATB
       if (player.atb < 100) {
         const chargeSpeed = devMode ? player.speed * 5 : player.speed;
@@ -386,9 +491,8 @@
       attacker.isAttacking = true;
       enemies = enemies;
       
-      if (!devMode) {
-        player.hp = Math.max(0, player.hp - damage);
-      }
+      // 移除 devMode 無敵限制，讓開發者測試受傷與回復邏輯
+      player.hp = Math.max(0, player.hp - damage);
 
       // 觸發玩家受傷特效
       player.isHit = true;
@@ -424,12 +528,18 @@
       isBossMode = false;
       enemies = []; // 清空現有怪物，防止 ID 累加與排版錯誤
       player = {
-        hp: gameConfig.playerInitialHp, maxHp: gameConfig.playerInitialHp, 
-        mp: gameConfig.playerInitialMp, maxMp: gameConfig.playerInitialMp,
+        hp: devMode ? 1000 : gameConfig.playerInitialHp,
+        maxHp: devMode ? 1000 : gameConfig.playerInitialHp,
+        mp: devMode ? 1000 : gameConfig.playerInitialMp,
+        maxMp: devMode ? 1000 : gameConfig.playerInitialMp,
         atb: 0, speed: gameConfig.playerSpeed, isHit: false, // 使用 config 中的速度
         isAttacking: false,
         selectedAction: null,
-        lastDamage: 0
+        lastDamage: 0,
+        lastHeal: 0,
+        lastMpRegen: 0,
+        hpFlask: { currentCharges: 3, maxCharges: 3, restoreAmount: 50 },
+        mpFlask: { currentCharges: 3, maxCharges: 3, restoreAmount: 50 }
       };
       spawnMonsters();
       addLog(t('gameRestarted'));
@@ -439,6 +549,7 @@
       selectedMonsterId = null; // spawnMonsters會重新設定
       comboCount = 0;
       currentWpm = 0;
+      devRegenCounter = 0; // 重置計數器
       if (burstInterval) clearInterval(burstInterval);
       currentWordInput = ""; // 重置輸入框內容
       currentWordIndex = 0; // 重置當前單字索引
@@ -454,6 +565,24 @@
       // 切換日誌 (熱鍵 0)
       if (e.key === '0') {
         showLog = !showLog;
+        return;
+      }
+
+      // 切換技能視窗 (熱鍵 9)
+      if (e.key === '9') {
+        showSkillsWindow = !showSkillsWindow;
+        return;
+      }
+
+      // 藥水熱鍵 (1/2)
+      if (e.key === '1') {
+        e.preventDefault();
+        useHpFlask();
+        return;
+      }
+      if (e.key === '2') {
+        e.preventDefault();
+        useMpFlask();
         return;
       }
 
@@ -477,7 +606,7 @@
       if (gameState === 'PAUSED' || gameState === 'GAME_OVER') return;
 
       if (gameState === 'ACTION_SELECT') {
-        const key = e.key.toUpperCase(); // M 改為 S
+        const key = e.key.toUpperCase();
         const aliveEnemies = enemies.filter(e => e.hp > 0);
 
         // 處理選擇移動 (h/l 或 左右方向鍵)
@@ -498,22 +627,29 @@
           }
         }
 
-        if (['A', 'S', 'I', 'B', 'R'].includes(key)) {
-          if (key === 'S' && player.mp < 30) {
-            addLog(t('mpNotEnough', gameConfig.skillMpCost), 'info');
+        // 更新為新的技能熱鍵映射 Q, W, E, R, T
+        if (['Q', 'W', 'E', 'R', 'T'].includes(key)) {
+          // 根據是否有裝備技能決定動作類型：有技能則為 S (需消耗MP)，無則為 A
+          const equipped = equippedSkills[key];
+          let actionKey = equipped ? 'S' : 'A';
+
+          const skillCost = gameConfig.skillMpCost || 30;
+          if (actionKey === 'S' && player.mp < skillCost) {
+            addLog(t('mpNotEnough', skillCost), 'info');
             return;
           }
           e.preventDefault();
-          player.selectedAction = key;
+          player.selectedAction = actionKey;
+          activeBurstKey = key; // 記錄觸發 Burst 的按鍵
 
-          if (key === 'A' || key === 'S') {
+          if (actionKey === 'A' || actionKey === 'S') {
             const target = aliveEnemies.find(m => m.id === selectedMonsterId);
             if (target) {
               target.isTargetSuccess = true;
               enemies = enemies;
 
-              if (key === 'S') {
-                player.mp -= gameConfig.skillMpCost;
+              if (actionKey === 'S') {
+                player.mp -= skillCost;
                 player = player;
                 addLog(t('skillActivated'), 'info');
               }
@@ -526,7 +662,7 @@
               }, 200);
             }
           } else {
-            executeQuickAction(key);
+            executeQuickAction(actionKey);
           }
         }
       } else if (gameState === 'BURST') {
@@ -622,16 +758,21 @@
         }, 200);
 
         // 立即計算傷害數值，以便後續視覺特效與傷害套用使用
-        let multiplier = player.selectedAction === 'S' ? 2 : 1;
+        const currentSkill = equippedSkills[activeBurstKey];
+        const hitType = currentSkill?.type || 'normal';
+
+        let multiplier = player.selectedAction === 'S' ? (currentSkill?.atk_multiplier || 2) : 1;
         if (devMode) multiplier *= 10; // Dev 模式傷害加成
         const damagePerWord = gameConfig.baseDamagePerWord * multiplier;
 
         // 觸發視覺特效
         currentTarget.isHit = true;
+        currentTarget.lastHitType = hitType; // 補上這一行：傳遞屬性類型給目標
         currentTarget.lastDamage = damagePerWord;
         const hitTarget = currentTarget;
         setTimeout(() => {
           hitTarget.isHit = false;
+          hitTarget.lastHitType = null; // 結束特效時清除屬性標記
           hitTarget.lastDamage = 0;
           enemies = enemies; // 確保狀態清除後能更新 UI
         }, 1000);
@@ -649,11 +790,24 @@
           // 檢查是否進入 Boss 房
           if (gameScore >= 100 && !isBossMode) {
             isBossMode = true;
+            isBossApproaching = true; // 觸發視覺特效
+            enemies = []; // 立即清空畫面上所有剩餘的怪物
+            selectedMonsterId = null; // 清除目前的選取目標
+
+            // 強制結束 Burst Mode 並補滿 ATB
+            if (gameState === 'BURST') endBurst();
+            player.atb = 100;
+            player = player;
+            gameState = 'ACTION_SELECT';
+
+            addLog("--- BOSS WARNING: AN ANCIENT POWER AWAKENS ---", 'unique');
+
             setTimeout(() => {
               enemies = [generateMonster(1, 'unique')];
               selectedMonsterId = enemies[0].id;
-              addLog("--- BOSS ROOM ---", 'unique'); // Boss 訊息
-            }, gameConfig.enemyRespawnDelay); // 等待最後一隻怪物的死亡動畫
+              isBossApproaching = false;
+              addLog("--- BOSS ROOM ---", 'unique');
+            }, 2000); // 延長轉場時間
           }
           // 擊敗 Boss 結算邏輯 (檢查是否真的擊敗了 Unique 階級的 Boss)
           else if (currentTarget.wordType === 'unique') {
@@ -727,6 +881,7 @@
     function resetTurn() {
       player.atb = 0;
       player.selectedAction = null;
+      activeBurstKey = null; // 重置使用的技能按鍵
       currentTarget = null; // 清除當前目標
       currentWordInput = "";
       currentBurstWords = [];
@@ -766,7 +921,7 @@
           onToggleHelp={() => showHelp = !showHelp}
         />
 
-        <BattleScene {enemies} {player} {gameState} {selectedMonsterId} {t} {currentLanguage} {showComboDisplay} {currentComboDisplayCount} {currentWpm} />
+        <BattleScene {enemies} {player} {gameState} {selectedMonsterId} {t} {currentLanguage} {showComboDisplay} {currentComboDisplayCount} {currentWpm} {isBossApproaching} {gameScore} {useHpFlask} {useMpFlask} {equippedSkills} {activeBurstKey} onDropSkill={handleAssignSkill} onRemoveSkill={handleRemoveSkill} onOpenSkills={() => { showSkillsWindow = !showSkillsWindow; }} />
 
         <UIPanel 
           {gameState} {t} 
@@ -780,6 +935,10 @@
         />
       </div>
     </main>
+
+    {#if showSkillsWindow}
+      <SkillSidebar {skillDb} {equippedSkills} {currentLanguage} onDropSkill={handleAssignSkill} onRemoveSkill={handleRemoveSkill} />
+    {/if}
   </div>
   
   <style>

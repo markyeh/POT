@@ -27,7 +27,7 @@
 <style>
   .message-log {
     width: 250px;
-    height: 650px; /* 同步增加高度以保持對齊 */
+    height: 750px; /* 統一高度為 750px */
     background: rgba(255, 255, 255, 0.02);
     padding: 15px;
     border: 1px solid #fff;

@@ -42,7 +42,6 @@
           <div class="help-grid">
             <p>{t('helpTarget')}</p>
             <p>{t('helpAttack')}</p>
-            <p>{t('helpItem')}</p>
           </div>
         </div>
       {/if}

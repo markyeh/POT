@@ -1,0 +1,58 @@
+{
+    "metadata": {
+      "description": "Comprehensive Game Skills - 6 Elements with Type Field",
+      "version": "1.2"
+    },
+    "skill_categories": [
+        { "id": "fire", "zh": "火系", "en": "Fire", "icon": "🔥" },
+        { "id": "wind", "zh": "風系", "en": "Wind", "icon": "🌪️" },
+        { "id": "ice", "zh": "冰系", "en": "Ice", "icon": "❄️" },
+        { "id": "thunder", "zh": "雷系", "en": "Bolt", "icon": "⚡" },
+        { "id": "poison", "zh": "毒系", "en": "Venom", "icon": "🧪" },
+        { "id": "blast", "zh": "爆系", "en": "Blast", "icon": "💥" }
+    ],
+    "skills": {
+      "fire": [
+        { "type": "fire", "zh": "火球", "en": "Fireball", "icon": "🔥", "atk": 140, "aoe": 1, "mp": 12, "cd": 2 },
+        { "type": "fire", "zh": "烈焰柱", "en": "Pillar", "icon": "♨️", "atk": 110, "aoe": 2, "mp": 30, "cd": 5 },
+        { "type": "fire", "zh": "噴火", "en": "Scorch", "icon": "🐲", "atk": 90, "aoe": 3, "mp": 45, "cd": 8 },
+        { "type": "fire", "zh": "流星雨", "en": "Meteor", "icon": "☄️", "atk": 130, "aoe": 4, "mp": 80, "cd": 15 },
+        { "type": "fire", "zh": "地獄火", "en": "Hellfire", "icon": "👿", "atk": 320, "aoe": 4, "mp": 160, "cd": 35 }
+      ],
+      "wind": [
+        { "type": "wind", "zh": "風刃", "en": "W-Blade", "icon": "🍃", "atk": 120, "aoe": 1, "mp": 10, "cd": 1 },
+        { "type": "wind", "zh": "氣旋", "en": "Cyclone", "icon": "🌀", "atk": 85, "aoe": 2, "mp": 25, "cd": 4 },
+        { "type": "wind", "zh": "風壓", "en": "Gale", "icon": "💨", "atk": 60, "aoe": 3, "mp": 35, "cd": 6 },
+        { "type": "wind", "zh": "真空破", "en": "Vacuum", "icon": "🌪️", "atk": 110, "aoe": 4, "mp": 60, "cd": 12 },
+        { "type": "wind", "zh": "狂風祭", "en": "Tempest", "icon": "🌬️", "atk": 250, "aoe": 4, "mp": 120, "cd": 25 }
+      ],
+      "ice": [
+        { "type": "ice", "zh": "冰彈", "en": "I-Bolt", "icon": "🧊", "atk": 110, "aoe": 1, "mp": 12, "cd": 1.5 },
+        { "type": "ice", "zh": "霜刺", "en": "Frost", "icon": "🗡️", "atk": 140, "aoe": 1, "mp": 20, "cd": 3 },
+        { "type": "ice", "zh": "冰封", "en": "Freeze", "icon": "🥶", "atk": 70, "aoe": 3, "mp": 40, "cd": 8 },
+        { "type": "ice", "zh": "暴風雪", "en": "Blizz", "icon": "🌨️", "atk": 95, "aoe": 4, "mp": 70, "cd": 15 },
+        { "type": "ice", "zh": "絕對零度", "en": "Zero", "icon": "💎", "atk": 280, "aoe": 4, "mp": 150, "cd": 30 }
+      ],
+      "thunder": [
+        { "type": "thunder", "zh": "電光", "en": "Spark", "icon": "✨", "atk": 130, "aoe": 1, "mp": 15, "cd": 2 },
+        { "type": "thunder", "zh": "雷擊", "en": "Strike", "icon": "⛈️", "atk": 180, "aoe": 1, "mp": 30, "cd": 5 },
+        { "type": "thunder", "zh": "連鎖雷", "en": "Chain", "icon": "⛓️", "atk": 90, "aoe": 3, "mp": 50, "cd": 10 },
+        { "type": "thunder", "zh": "電漿炮", "en": "Plasma", "icon": "☄️", "atk": 150, "aoe": 2, "mp": 80, "cd": 12 },
+        { "type": "thunder", "zh": "天罰", "en": "Judge", "icon": "🔱", "atk": 400, "aoe": 1, "mp": 180, "cd": 40 }
+      ],
+      "poison": [
+        { "type": "poison", "zh": "毒霧", "en": "Misty", "icon": "🌫️", "atk": 40, "aoe": 4, "mp": 20, "cd": 5 },
+        { "type": "poison", "zh": "腐蝕", "en": "Acid", "icon": "☣️", "atk": 100, "aoe": 1, "mp": 25, "cd": 4 },
+        { "type": "poison", "zh": "劇毒針", "en": "Needle", "icon": "💉", "atk": 160, "aoe": 1, "mp": 45, "cd": 6 },
+        { "type": "poison", "zh": "瘟疫", "en": "Plague", "icon": "🤢", "atk": 75, "aoe": 4, "mp": 65, "cd": 18 },
+        { "type": "poison", "zh": "萬毒崩", "en": "Nova", "icon": "💀", "atk": 180, "aoe": 4, "mp": 130, "cd": 28 }
+      ],
+      "blast": [
+        { "type": "blast", "zh": "火花", "en": "Flare", "icon": "🧨", "atk": 150, "aoe": 1, "mp": 18, "cd": 3 },
+        { "type": "blast", "zh": "爆破陣", "en": "Mine", "icon": "💣", "atk": 200, "aoe": 2, "mp": 50, "cd": 10 },
+        { "type": "blast", "zh": "彗星撞", "en": "Impact", "icon": "☄️", "atk": 220, "aoe": 3, "mp": 90, "cd": 20 },
+        { "type": "blast", "zh": "熱核爆", "en": "Nuke", "icon": "☢️", "atk": 350, "aoe": 4, "mp": 200, "cd": 60 },
+        { "type": "blast", "zh": "終焉爆", "en": "Final", "icon": "☀️", "atk": 500, "aoe": 4, "mp": 300, "cd": 90 }
+      ]
+    }
+  }

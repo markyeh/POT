@@ -39,15 +39,7 @@
   </div>
 
   <div class="input-area">
-    {#if gameState === 'ACTION_SELECT'}
-      <div class="action-menu">
-        <span class="key-hint">A</span> {t('attack')}
-        <span class="key-hint">S</span> {t('skill')}
-        <span class="key-hint">I</span> {t('item')}
-        <span class="key-hint">B</span> {t('block')}
-        <span class="key-hint">R</span> {t('run')}
-      </div>
-    {:else if gameState === 'BURST'}
+    {#if gameState === 'BURST'}
       <div class="burst-container">
         <!-- Burst Mode Timer Bar -->
         <div class="timer-bar" style="width: {(burstTimeLeft/burstMaxTime)*100}%"></div>
@@ -118,8 +110,7 @@
   }
   .targeting-status { font-size: 1.2rem; color: #fff; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
-  .action-menu { font-size: 1.2rem; }
-  .key-hint { background: #fff; color: #000; padding: 2px 6px; margin-right: 5px; }
+
   .burst-container { text-align: center; width: 100%; }
   .timer-bar { height: 4px; background: #fff; margin: 0 0 5px 0; transition: width 0.1s linear; }
   .timer-text { font-size: 0.9rem; color: #fff; margin-bottom: 2px; font-weight: bold; }

@@ -16,9 +16,9 @@
     "unique": { "hp": 1000, "speed": 1.0, "icon": "👑", "affixCount": 6 }
   },
   "scoreMap": {
-    "white": 1,
-    "magic": 3,
-    "rare": 6,
+    "white": 10,
+    "magic": 30,
+    "rare": 60,
     "unique": 0
   },
   "maxEnemies": 4,
@@ -28,6 +28,15 @@
     "magic": "data/monkeytype_english.json",
     "rare": "data/monkeytype_english.json",
     "unique": "data/monkeytype_english.json"
+  },
+  "flaskConfig": {
+    "hpFlaskMaxCharges": 3,
+    "hpFlaskChargeCost": 1,
+    "hpFlaskRestoreAmount": 50,
+    "mpFlaskMaxCharges": 3,
+    "mpFlaskChargeCost": 1,
+    "mpFlaskRestoreAmount": 50,
+    "chargesPerKill": 1
   },
   "typingConfig": {
     "wordsPerLine": 12,

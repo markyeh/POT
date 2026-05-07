@@ -9,13 +9,45 @@
   export let showComboDisplay; // 接收連擊數顯示狀態
   export let currentComboDisplayCount; // 接收當前連擊數
   export let currentWpm = 0; // 接收即時 WPM
+  export let isBossApproaching = false; // 接收 Boss 登場狀態
+  export let useHpFlask; // 從 App.svelte 傳遞過來的函數
+  export let useMpFlask; // 從 App.svelte 傳遞過來的函數
+  export let gameScore = 0; // 接收進度作為 EXP
+  export let equippedSkills = {};
+  export let onDropSkill;
+  export let onRemoveSkill;
+  export let onOpenSkills;
+  export let activeBurstKey = null; // 接收當前使用的按鍵
 
   // 計算當前選中怪物的索引，用於定位選擇框
   $: selectedIndex = enemies.findIndex(e => e.id === selectedMonsterId);
   $: showFrame = selectedIndex !== -1 && (gameState === 'ACTION_SELECT' || gameState === 'BATTLE');
+
+  let hoveredSkill = null;
+  let tooltipPos = { x: 0, y: 0 };
+
+  function showTooltip(skill, e) {
+    if (!skill) return;
+    hoveredSkill = skill;
+    tooltipPos = { x: e.clientX, y: e.clientY };
+  }
+  function moveTooltip(e) {
+    tooltipPos = { x: e.clientX, y: e.clientY };
+  }
+  function hideTooltip() {
+    hoveredSkill = null;
+  }
 </script>
 
 <div class="battle-scene">
+  <!-- Boss 登場特效遮罩 -->
+  {#if isBossApproaching}
+    <div class="boss-warning-overlay" transition:fade={{duration: 200}}>
+      <div class="warning-text">WARNING</div>
+      <div class="warning-sub">BOSS APPROACHING</div>
+    </div>
+  {/if}
+
   <div class="enemies-row">
     <!-- 平滑移動的選擇框 -->
     {#if showFrame}
@@ -29,12 +61,24 @@
       <div 
         class="monster-wrapper" 
         class:dead={enemy.hp <= 0} 
-        class:hit={enemy.isHit}
         class:attacking={enemy.isAttacking}
         class:target-success={enemy.isTargetSuccess}
         style="--tier-color: {enemy.wordType === 'white' ? '#fff' : (enemy.wordType === 'magic' ? '#3498db' : (enemy.wordType === 'rare' ? '#f1c40f' : '#9b59b6'))};">
         <div class="monster-sprite">
-          {enemy.icon}
+          <!-- 受擊特效僅套用在 monster-icon 上 -->
+          <div class="monster-icon" 
+            class:hit={enemy.isHit}
+            class:hit-fire={enemy.isHit && enemy.lastHitType === 'fire'}
+            class:hit-ice={enemy.isHit && enemy.lastHitType === 'ice'}
+            class:hit-thunder={enemy.isHit && enemy.lastHitType === 'thunder'}
+            class:hit-wind={enemy.isHit && enemy.lastHitType === 'wind'}
+            class:hit-poison={enemy.isHit && enemy.lastHitType === 'poison'}
+            class:hit-blast={enemy.isHit && enemy.lastHitType === 'blast'}>
+            {enemy.icon}
+          </div>
+          {#if enemy.lastDamage > 0}
+            <span class="damage-pop sprite-damage">-{enemy.lastDamage}</span>
+          {/if}
         </div>
         <div class="monster-name-display">
           <div class="name-race">{enemy.nameParts.race[currentLanguage]}</div>
@@ -42,9 +86,6 @@
         </div>
         <div class="stat-row">
           {t('hp')}: {enemy.hp} / {enemy.maxHp}
-          {#if enemy.lastDamage > 0}
-            <span class="damage-pop">-{enemy.lastDamage}</span>
-          {/if}
         </div>
         <div class="bar-container"><div class="hp-fill" style="width: {(enemy.hp/enemy.maxHp)*100}%"></div></div>
         <div class="stat-row">{t('mp')}: {enemy.mp} / {enemy.maxMp}</div>
@@ -58,7 +99,7 @@
   <div class="player-section">
     <!-- 連擊顯示移出 player-visual-wrapper，避免受受傷震動動畫影響 -->
     <!-- 僅當 showComboDisplay 為真且連擊數達到 2 以上才顯示 -->
-    {#if showComboDisplay && currentComboDisplayCount >= 2}
+    {#if showComboDisplay && currentComboDisplayCount >= 1}
       <div class="combo-display">
         <div class="combo-number">{currentComboDisplayCount}</div>
         <div class="combo-text">HITS!</div>
@@ -66,22 +107,113 @@
       </div>
     {/if}
     
-    <div class="player-visual-wrapper" class:attacking={player.isAttacking} class:hit={player.isHit}>
-      <div class="player-sprite">🛡️</div>
-      <div class="player-tag">PLAYER</div> 
-      <div class="stat-row">
-        {t('hp')}: {player.hp} / {player.maxHp}
+    <div class="player-visual-wrapper" class:attacking={player.isAttacking}>
+      <div class="player-sprite-container">
+        <!-- 受擊特效僅套用在 player-sprite 上 -->
+        <div class="player-sprite" class:hit={player.isHit}>🛡️</div>
         {#if player.lastDamage > 0}
-          <span class="damage-pop">-{player.lastDamage}</span>
+          <span class="damage-pop sprite-damage">-{player.lastDamage}</span>
+        {/if}
+        {#if player.lastHeal > 0}
+          <span class="damage-pop sprite-damage heal-pop">+{player.lastHeal}</span>
+        {/if}
+        {#if player.lastMpRegen > 0}
+          <span class="damage-pop sprite-damage mp-pop">+{player.lastMpRegen}</span>
         {/if}
       </div>
-      <div class="bar-container"><div class="hp-fill" style="width: {(player.hp/player.maxHp)*100}%"></div></div>
-      <div class="stat-row">{t('mp')}: {player.mp} / {player.maxMp}</div>
-      <div class="bar-container"><div class="mp-fill" style="width: {(player.mp/player.maxMp)*100}%"></div></div>
-      <div class="stat-row">{t('atb')}: {Math.floor(player.atb)}%</div>
-      <div class="bar-container atb"><div class="atb-fill" style="width: {player.atb}%"></div></div>
+    </div>
+
+    <!-- PoE Style Interface -->
+    <div class="poe-interface">
+      <!-- Left: HP Orb -->
+      <div class="orb hp-orb">
+        <div class="liquid" style="height: {(player.hp/player.maxHp)*100}%"></div>
+        <div class="orb-glass"></div>
+        <div class="orb-value">{player.hp}</div>
+      </div>
+
+      <!-- Center: Action Bar -->
+      <div class="action-bar-container">
+        <div class="flasks-row">
+          <div class="flask-slot hp-flask" on:click={useHpFlask}>
+            {#if player.hpFlask}
+              <div class="flask-fill" style="height: {(player.hpFlask.currentCharges / (player.hpFlask.maxCharges || 1)) * 100}%"></div>
+              <span class="flask-charges">{player.hpFlask.currentCharges}</span>
+            {/if}
+            <span class="flask-key">1</span>
+          </div>
+          <div class="flask-slot mp-flask" on:click={useMpFlask}>
+            {#if player.mpFlask}
+              <div class="flask-fill" style="height: {(player.mpFlask.currentCharges / (player.mpFlask.maxCharges || 1)) * 100}%"></div>
+              <span class="flask-charges">{player.mpFlask.currentCharges}</span>
+            {/if}
+            <span class="flask-key">2</span>
+          </div>
+        </div>
+        
+        <!-- 技能欄位現在支援拖放 -->
+        <div class="skill-slots">
+          {#each ['Q', 'W', 'E', 'R', 'T'] as key, i}
+            <div 
+              class="skill-slot" 
+              class:active={gameState === 'ACTION_SELECT'}
+              class:using={gameState === 'BURST' && activeBurstKey === key}
+              on:click={onOpenSkills}
+              on:contextmenu|preventDefault={() => onRemoveSkill(key)}
+              on:mouseenter={(e) => showTooltip(equippedSkills[key], e)}
+              on:mousemove={moveTooltip}
+              on:mouseleave={hideTooltip}
+              on:dragover|preventDefault
+              on:drop={(e) => {
+                const skillData = JSON.parse(e.dataTransfer.getData('skill'));
+                onDropSkill(key, skillData);
+              }}>
+              <span class="key">{key}</span>
+              <span class="slot-index">{i + 1}</span>
+              <span class="label">{equippedSkills[key] ? equippedSkills[key].icon : '-'}</span>
+            </div>
+          {/each}
+        </div>
+
+        <!-- Experience Bar -->
+        <div class="exp-bar-container">
+          <div class="exp-fill" style="width: {gameScore}%"></div>
+        </div>
+
+        <!-- ATB integrated here -->
+        <div class="atb-minimal">
+          <div class="atb-fill" style="width: {player.atb}%"></div>
+        </div>
+      </div>
+
+      <!-- Right: MP Orb -->
+      <div class="orb mp-orb">
+        <div class="liquid" style="height: {(player.mp/player.maxMp)*100}%"></div>
+        <div class="orb-glass"></div>
+        <div class="orb-value">{player.mp}</div>
+      </div>
     </div>
   </div>
+
+  {#if hoveredSkill}
+    <div class="skill-tooltip" style="top: {tooltipPos.y}px; left: {tooltipPos.x}px;">
+      <div class="tooltip-header">
+        <span class="tooltip-icon">{hoveredSkill.icon}</span>
+        <span class="tooltip-name">{hoveredSkill[currentLanguage === 'zh' ? 'zh' : 'en'] || hoveredSkill.en}</span>
+      </div>
+      <div class="tooltip-body">
+        <div class="tooltip-stats-grid">
+          {#if hoveredSkill.atk}<div class="tooltip-stat">ATK: <span class="stat-val">{hoveredSkill.atk}</span></div>{/if}
+          {#if hoveredSkill.aoe}<div class="tooltip-stat">AOE: <span class="stat-val">{hoveredSkill.aoe}</span></div>{/if}
+          {#if hoveredSkill.mp}<div class="tooltip-stat">MP: <span class="mp-val">{hoveredSkill.mp}</span></div>{/if}
+          {#if hoveredSkill.cd}<div class="tooltip-stat">CD: <span class="stat-val">{hoveredSkill.cd}s</span></div>{/if}
+        </div>
+        {#if hoveredSkill.description || hoveredSkill[`desc_${currentLanguage}`]}
+          <p class="tooltip-desc">{hoveredSkill[`desc_${currentLanguage}`] || hoveredSkill.description || ''}</p>
+        {/if}
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -95,6 +227,38 @@
     perspective: 500px;
     position: relative;
   }
+
+  /* Boss 登場轉場特效 */
+  .boss-warning-overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(139, 0, 0, 0.4);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    animation: danger-flash 0.5s infinite;
+    pointer-events: none;
+  }
+  .warning-text {
+    font-size: 4rem;
+    font-weight: 900;
+    color: #ff0000;
+    text-shadow: 0 0 20px #000;
+    letter-spacing: 10px;
+  }
+  .warning-sub {
+    font-size: 1.2rem;
+    color: #fff;
+    font-weight: bold;
+    margin-top: 10px;
+  }
+  @keyframes danger-flash {
+    0%, 100% { background: rgba(139, 0, 0, 0.4); }
+    50% { background: rgba(255, 0, 0, 0.2); }
+  }
+
   .enemies-row {
     display: flex;
     width: 100%;
@@ -109,6 +273,66 @@
   .monster-wrapper.hit, .player-visual-wrapper.hit { animation: shake 0.15s infinite, flash 0.15s ease-out; }
   .monster-wrapper.attacking { animation: lunge 0.4s ease-out; z-index: 5; }
   .monster-wrapper.target-success { animation: target-flash 0.2s ease-out; }
+
+  /* --- 強化版屬性攻擊特效 --- */
+
+  /* 火：點燃燃燒感，加入色相閃爍與劇烈上升位移 */
+  .hit-fire { 
+    animation: fire-bloom 0.2s ease-in-out infinite !important; 
+    filter: drop-shadow(0 0 40px #ff4500) drop-shadow(0 0 10px #ffff00) brightness(2.5) !important; 
+  }
+  @keyframes fire-bloom {
+    0%, 100% { transform: scale(1.1) translateY(0); filter: hue-rotate(0deg); }
+    50% { transform: scale(1.15) translateY(-10px); filter: hue-rotate(15deg); }
+  }
+
+  /* 冰：極低溫凍結 + 寒氣發光 + 高頻凍裂顫動 */
+  .hit-ice { animation: ice-shiver 0.1s infinite !important; filter: drop-shadow(0 0 40px #00fbff) brightness(1.8) contrast(1.5) hue-rotate(180deg) !important; }
+  @keyframes ice-shiver {
+    0%, 100% { transform: scale(0.9) translate(1px, 1px); }
+    25% { transform: scale(0.9) translate(-1px, -1px); }
+    50% { transform: scale(0.85) translate(1px, -1px); }
+    75% { transform: scale(0.85) translate(-1px, 1px); }
+  }
+
+  /* 雷：極速白光閃爍 + 隨機位移 (模擬電弧) */
+  .hit-thunder { animation: bolt-strobe 0.1s steps(2) infinite !important; filter: brightness(5) contrast(2) !important; }
+  @keyframes bolt-strobe {
+    0% { transform: translate(10px, 0); opacity: 1; }
+    50% { transform: translate(-10px, 10px); opacity: 0.5; }
+    100% { transform: translate(5px, -10px); opacity: 1; }
+  }
+
+  /* 風：強化的龍捲風感，增加旋轉斜切與動態模糊 */
+  .hit-wind { animation: wind-vortex 0.15s linear infinite !important; filter: blur(5px) contrast(1.5) opacity(0.6) !important; }
+  @keyframes wind-vortex {
+    0% { transform: rotate(0deg) skew(0deg) scale(1.1); }
+    50% { transform: rotate(15deg) skew(10deg) scale(1.2); }
+    100% { transform: rotate(-15deg) skew(-10deg) scale(1.1); }
+  }
+
+  /* 毒：劇毒滲透 + 扭曲溶解感 + 色相劇烈偏移 */
+  .hit-poison { animation: poison-dissolve 0.4s ease-in-out infinite !important; filter: drop-shadow(0 0 40px #2bff00) saturate(4) !important; }
+  @keyframes poison-dissolve {
+    0%, 100% { transform: scale(1) skew(0deg); filter: hue-rotate(280deg); }
+    33% { transform: scale(1.1, 0.9) skew(10deg); filter: hue-rotate(320deg); }
+    66% { transform: scale(0.9, 1.1) skew(-10deg); filter: hue-rotate(250deg); }
+  }
+
+  /* 爆炸：瞬間巨大化 + 螢幕發白 */
+  .monster-icon.hit-blast { 
+    animation: blast-nova 0.3s cubic-bezier(0.19, 1, 0.22, 1) infinite !important; 
+    box-shadow: 0 0 20px 10px rgba(255, 165, 0, 0.8), 0 0 40px 20px rgba(255, 255, 0, 0.6); /* 初始火花 */
+  }
+  @keyframes blast-nova {
+    0% { transform: scale(1); filter: brightness(1); }
+    20% { transform: scale(1.8); filter: brightness(10) white-balance(100%); box-shadow: 0 0 30px 15px rgba(255, 165, 0, 1), 0 0 60px 30px rgba(255, 255, 0, 0.8); }
+    50% { transform: scale(1.7); filter: brightness(5) drop-shadow(0 0 50px #fff); box-shadow: 0 0 50px 25px rgba(255, 165, 0, 0.5), 0 0 80px 40px rgba(255, 255, 0, 0.3); }
+    100% { transform: scale(1.6); filter: brightness(1.5) drop-shadow(0 0 40px #fff); box-shadow: 0 0 0px 0px transparent; }
+  }
+
+  /* 重寫基礎 shake 以免與屬性特效衝突 */
+  .monster-icon.hit:not([class*='hit-']) { animation: shake 0.15s infinite, flash 0.15s ease-out; }
 
   /* 獨立選擇框樣式 */
   .selection-frame {
@@ -131,13 +355,155 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%;
+    margin-top: 20px;
   }
 
-  .player-visual-wrapper { text-align: center; transition: transform 0.2s ease-out; }
+  .player-visual-wrapper { text-align: center; transition: transform 0.2s ease-out; margin-bottom: 10px; }
   .player-visual-wrapper.attacking { transform: translateY(-40px) scale(1.1); }
   
-  .player-sprite { font-size: 4rem; filter: drop-shadow(0 0 10px rgba(255,255,255,0.5)); margin-bottom: 5px; }
-  .player-tag { font-size: 1.2rem; font-weight: bold; color: #fff; margin-bottom: 8px; text-transform: uppercase; }
+  .player-sprite-container { position: relative; display: inline-block; }
+  .player-sprite { font-size: 3.5rem; filter: drop-shadow(0 0 10px rgba(255,255,255,0.5)); }
+
+  /* PoE Interface Styles */
+  .poe-interface {
+    display: flex;
+    align-items: flex-end;
+    gap: 15px;
+    padding: 10px;
+    background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, transparent 100%);
+    border-radius: 50px 50px 0 0;
+    width: 600px;
+    justify-content: space-between;
+  }
+
+  .orb {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid #444;
+    position: relative;
+    overflow: hidden;
+    background: #111;
+    box-shadow: 0 0 15px rgba(0,0,0,0.5);
+  }
+  .hp-orb .liquid {
+    background: linear-gradient(0deg, #600 0%, #f00 100%);
+    box-shadow: 0 0 20px rgba(255,0,0,0.5);
+  }
+  .mp-orb .liquid {
+    background: linear-gradient(0deg, #006 0%, #00f 100%);
+    box-shadow: 0 0 20px rgba(0,0,255,0.5);
+  }
+  .liquid {
+    position: absolute;
+    bottom: 0; left: 0; width: 100%;
+    transition: height 0.5s ease-out;
+  }
+  .orb-glass {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2) 0%, transparent 50%);
+    pointer-events: none;
+  }
+  .orb-value {
+    position: absolute;
+    width: 100%; text-align: center; top: 50%; transform: translateY(-50%);
+    font-weight: bold; font-size: 0.9rem; text-shadow: 1px 1px 3px #000; z-index: 2;
+  }
+
+  /* Action Bar Styles */
+  .action-bar-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .flasks-row { display: flex; gap: 12px; }
+  .flask-slot {
+    width: 34px; height: 50px;
+    border: 1px solid #aaa; /* 提高邊框亮度 */
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: inset 0 0 8px rgba(0,0,0,0.8);
+  }
+  .flask-fill { 
+    position: absolute; bottom: 0; left: 0; width: 100%; 
+    transition: height 0.3s ease-out;
+    z-index: 1;
+  }
+  .hp-flask .flask-fill { background: linear-gradient(0deg, #800 0%, #ff1111 100%); }
+  .mp-flask .flask-fill { background: linear-gradient(0deg, #008 0%, #1111ff 100%); }
+  .flask-charges { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; text-shadow: 1px 1px 2px #000; font-size: 0.8rem; z-index: 2; }
+  .flask-key { position: absolute; bottom: 2px; right: 3px; font-size: 0.6rem; color: #ccc; z-index: 2; }
+
+  .skill-slots { display: flex; gap: 6px; }
+  .skill-slot {
+    width: 50px; height: 50px; border: 1px solid #fff;
+    background: rgba(255,255,255,0.05); position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .skill-slot.active { border-color: #fff; box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.3); }
+  
+  /* 使用中技能的高亮樣式 */
+  .skill-slot.using { 
+    border-color: #f1c40f; 
+    box-shadow: 0 0 15px #f1c40f, inset 0 0 10px rgba(241, 196, 15, 0.5);
+    background: rgba(241, 196, 15, 0.2);
+  }
+
+  .skill-slot .key { position: absolute; top: 2px; left: 3px; font-size: 0.6rem; color: #f1c40f; font-weight: bold; }
+  .skill-slot .slot-index { position: absolute; top: 2px; right: 3px; font-size: 0.5rem; color: #888; }
+  .skill-slot .label { font-size: 1.2rem; color: #fff; margin-top: 5px; }
+
+  .skill-tooltip {
+    position: fixed;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.9);
+    border: 1px solid #f1c40f;
+    padding: 10px;
+    pointer-events: none;
+    width: 180px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    transform: translate(15px, 15px);
+  }
+  .tooltip-header { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 5px; }
+  .tooltip-name { color: #f1c40f; font-weight: bold; font-size: 0.8rem; text-align: left; }
+  .tooltip-icon { font-size: 1.2rem; }
+  .tooltip-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 5px; }
+  .tooltip-stat { font-size: 0.7rem; color: #ccc; text-align: left; }
+  .mp-val { color: #3498db; font-weight: bold; }
+  .stat-val { color: #fff; font-weight: bold; }
+  .tooltip-desc { font-size: 0.65rem; color: #aaa; margin: 5px 0 0 0; line-height: 1.3; text-align: left; }
+
+  .exp-bar-container {
+    width: 300px; height: 4px; background: #222; border: 1px solid #444;
+    margin-top: 5px;
+  }
+  .exp-fill { height: 100%; background: #3498db; transition: width 0.3s; }
+
+  .atb-minimal {
+    width: 300px; height: 2px; background: rgba(0,0,0,0.5); margin-top: -2px;
+  }
+  .atb-minimal .atb-fill { height: 100%; background: #fff; transition: width 0.1s; }
+
+  .sprite-damage {
+    left: 80%;
+    top: 0;
+    font-size: 1.8rem;
+    text-shadow: 2px 2px 4px #000;
+    z-index: 20;
+    white-space: nowrap;
+  }
+  .heal-pop { color: #00ff00 !important; }
+  .mp-pop { 
+    color: #3498db !important; 
+    margin-left: 45px !important; /* 增加偏移量，避免與 HP 回復數值重疊 */
+  }
 
   .monster-name-display { 
     font-weight: bold; 
@@ -163,7 +529,12 @@
   .letter.correct { color: #fff; text-shadow: 0 0 5px #fff; }
 
   .stat-row { text-align: left; width: 100px; margin: 0 auto; font-size: 0.7rem; }
-  .monster-sprite { font-size: 3rem; margin-bottom: 5px; filter: drop-shadow(0 0 5px var(--tier-color, transparent)); }
+  .monster-sprite { position: relative; display: inline-block; margin-bottom: 5px; }
+  .monster-icon { 
+    font-size: 3rem; 
+    filter: drop-shadow(0 0 5px var(--tier-color, transparent)); 
+    transition: transform 0.2s; 
+  }
   
   .bar-container { width: 100px; height: 4px; background: #000; border: 1px solid #fff; margin: 4px auto; }
   .hp-fill, .atb-fill, .mp-fill { height: 100%; background: #fff; transition: width 0.3s; }
@@ -181,8 +552,8 @@
   /* 連擊數顯示樣式 */
   .combo-display {
     position: absolute;
-    left: -140px; /* 移至玩家左側 */
-    top: 20px;
+    left: 20px; /* 修正：將座標移回畫布內，避免被 overflow: hidden 剪裁 */
+    top: 0px; /* 往下移動，避免擋到怪物資訊 */
     display: flex;
     flex-direction: column;
     align-items: flex-end; /* 向玩家方向對齊 */
