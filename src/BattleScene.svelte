@@ -67,6 +67,7 @@
       <div 
         class="monster-wrapper" 
         class:dead={enemy.hp <= 0} 
+        class:hit={enemy.isHit}
         class:attacking={enemy.isAttacking}
         class:target-success={enemy.isTargetSuccess}
         class:unique={enemy.wordType === 'unique'}
@@ -286,6 +287,11 @@
     text-align: center; 
     transition: all 0.5s; 
     width: 100%;
+    position: relative;
+  }
+  /* 修正：如果正在受擊，即使死亡也不要立即消失，確保特效被看到 */
+  .monster-wrapper.dead.hit {
+    opacity: 1 !important;
   }
   .monster-wrapper.dead { opacity: 0; transform: scale(0.5) translateY(100px); }
   .monster-wrapper.hit, .player-visual-wrapper.hit { animation: shake 0.15s infinite, flash 0.15s ease-out; }
@@ -354,17 +360,17 @@
     filter: drop-shadow(0 0 40px #ff4500) drop-shadow(0 0 10px #ffff00) brightness(2.5) !important; 
   }
   @keyframes fire-bloom {
-    0%, 100% { transform: scale(1.1) translateY(0); filter: hue-rotate(0deg); }
-    50% { transform: scale(1.15) translateY(-10px); filter: hue-rotate(15deg); }
+    0%, 100% { transform: scale(1.3) translateY(0); filter: hue-rotate(0deg); }
+    50% { transform: scale(1.45) translateY(-20px); filter: hue-rotate(15deg) brightness(1.5); }
   }
 
   /* 冰：極低溫凍結 + 寒氣發光 + 高頻凍裂顫動 */
   .hit-ice { animation: ice-shiver 0.1s infinite !important; filter: drop-shadow(0 0 40px #00fbff) brightness(1.8) contrast(1.5) hue-rotate(180deg) !important; }
   @keyframes ice-shiver {
-    0%, 100% { transform: scale(0.9) translate(1px, 1px); }
-    25% { transform: scale(0.9) translate(-1px, -1px); }
-    50% { transform: scale(0.85) translate(1px, -1px); }
-    75% { transform: scale(0.85) translate(-1px, 1px); }
+    0%, 100% { transform: scale(1.2) translate(2px, 2px); }
+    25% { transform: scale(1.2) translate(-2px, -2px); }
+    50% { transform: scale(1.3) translate(2px, -2px); }
+    75% { transform: scale(1.3) translate(-2px, 2px); }
   }
 
   /* 雷：極速白光閃爍 + 隨機位移 (模擬電弧) */
@@ -378,9 +384,9 @@
   /* 風：強化的龍捲風感，增加旋轉斜切與動態模糊 */
   .hit-wind { animation: wind-vortex 0.15s linear infinite !important; filter: blur(5px) contrast(1.5) opacity(0.6) !important; }
   @keyframes wind-vortex {
-    0% { transform: rotate(0deg) skew(0deg) scale(1.1); }
-    50% { transform: rotate(15deg) skew(10deg) scale(1.2); }
-    100% { transform: rotate(-15deg) skew(-10deg) scale(1.1); }
+    0% { transform: rotate(0deg) skew(0deg) scale(1.3); }
+    50% { transform: rotate(15deg) skew(10deg) scale(1.5); }
+    100% { transform: rotate(-15deg) skew(-10deg) scale(1.3); }
   }
 
   /* 毒：劇毒滲透 + 扭曲溶解感 + 色相劇烈偏移 */
@@ -605,9 +611,9 @@
   .atb-minimal .atb-fill { height: 100%; background: #fff; transition: width 0.1s; }
 
   .sprite-damage {
-    left: 80%;
-    top: 0;
-    font-size: 1.8rem;
+    left: 50%;
+    top: -20px;
+    font-size: 2.2rem;
     text-shadow: 2px 2px 4px #000;
     z-index: 20;
     white-space: nowrap;

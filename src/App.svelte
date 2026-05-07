@@ -618,6 +618,26 @@
         return;
       }
 
+      // 在 BURST 模式下，按 Tab 鍵循環切換技能
+        if (gameState === 'BURST' && e.key === 'Tab') {
+        e.preventDefault();
+        const skillKeys = ['Q', 'W', 'E', 'R', 'T'];
+        let currentIndex = skillKeys.indexOf(activeBurstKey);
+        
+        // 尋找下一個有裝備技能的欄位
+        for (let i = 1; i <= skillKeys.length; i++) {
+          const nextIdx = (currentIndex + i) % skillKeys.length;
+          const nextKey = skillKeys[nextIdx];
+          
+          if (equippedSkills[nextKey]) {
+            activeBurstKey = nextKey;
+            addLog(`Switched to Skill: ${equippedSkills[nextKey][currentLanguage === 'zh' ? 'zh' : 'en']}`, 'info');
+            break;
+          }
+        }
+        return;
+      }
+
       if (gameState === 'PAUSED' || gameState === 'GAME_OVER') return;
 
       if (gameState === 'ACTION_SELECT') {
