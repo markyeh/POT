@@ -4,6 +4,8 @@
   export let gameState;
   export let t;
   export let onClear;
+  export let onToggleLog;
+  export let hotkeys = {};
 
   let logContainer;
 
@@ -16,6 +18,7 @@
   <div class="sidebar-header">
     {t('logHeader')}
     <button class="header-action-btn" on:click={onClear} title={t('clear')}>{t('clear')}</button>
+    <button class="close-x-btn" on:click={onToggleLog} title="Close [{hotkeys.toggleLog || '0'}]">×</button>
   </div>
 
   <div class="log-scroll" bind:this={logContainer}>
@@ -50,11 +53,18 @@
   }
 
   .header-action-btn {
-    position: absolute; right: 0; top: 0; background: none; border: none;
+    position: absolute; left: 0; top: 0; background: none; border: none;
     color: #888; font-size: 0.6rem; cursor: pointer; height: 100%;
     padding: 0 5px; font-family: inherit;
   }
   .header-action-btn:hover { color: #f1c40f; }
+
+  .close-x-btn {
+    position: absolute; right: 0; top: -5px; background: none; border: none;
+    color: #fff; font-size: 1.5rem; cursor: pointer; line-height: 1;
+    padding: 0 5px;
+  }
+  .close-x-btn:hover { color: #f1c40f; }
 
   .log-scroll {
     flex: 1;

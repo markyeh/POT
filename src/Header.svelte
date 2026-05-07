@@ -3,9 +3,11 @@
   export let currentLanguage;
   export let showLog;
   export let showSkillsWindow;
+  export let showInventoryWindow;
   export let hotkeys = {};
   export let onToggleLog;
   export let onToggleSkills;
+  export let onToggleInventory;
   export let onToggleHelp;
   export let onSetLanguage;
   export let currentTheme;
@@ -21,6 +23,7 @@
   <div class="header-controls">
     <button on:click={onToggleLog} class:active={showLog}>{t('log')} ({hotkeys.toggleLog})</button>
     <button on:click={onToggleSkills} class:active={showSkillsWindow}>{t('skills')} ({hotkeys.toggleSkills})</button>
+    <button on:click={onToggleInventory} class:active={showInventoryWindow}>{t('inventory')} ({hotkeys.toggleInventory || 'I'})</button>
     <button on:click={onToggleHelp} title={t('helpTitle')}>?</button>
     <div class="divider"></div>
     <div class="theme-select-container">

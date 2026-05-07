@@ -5,6 +5,7 @@
     import BattleScene from './BattleScene.svelte';
     import ModalOverlay from './ModalOverlay.svelte';
     import UIPanel from './UIPanel.svelte';
+    import InventorySidebar from './InventorySidebar.svelte';
     import HelperOverlay from './HelperOverlay.svelte';
     import SkillSidebar from './SkillSidebar.svelte';
   
@@ -21,6 +22,7 @@
     let gameScore = 0; // 當前地圖進度分數 (0-100)
     let isBossApproaching = false; // Boss 登場特效狀態
     let showSkillsWindow = false; // 技能視窗顯示狀態
+    let showInventoryWindow = false; // 物品欄顯示狀態
     let isBossMode = false; // 是否進入 Boss 房
     let showComboDisplay = false; // 控制連擊數顯示 (這是 UI 狀態，非配置)
     let currentComboDisplayCount = 0; // 當前連擊數
@@ -84,6 +86,14 @@
     const useMpFlask = () => useFlask('mp');
 
     // --- 技能處理 ---
+    function onToggleLog() {
+      showLog = !showLog;
+      if (showLog) {
+        showSkillsWindow = false;
+        showInventoryWindow = false;
+      }
+    }
+
     function handleRemoveSkill(slot) {
       if (equippedSkills[slot]) {
         addLog(`Unequipped ${equippedSkills[slot].en} from [${slot}]`, 'system');
@@ -100,7 +110,19 @@
 
     function onToggleSkills() {
       showSkillsWindow = !showSkillsWindow;
-      if (!showSkillsWindow) lastClickedSkillSlotKey = null; // 關閉視窗時清除選中的欄位
+      if (showSkillsWindow) {
+        showInventoryWindow = false;
+        showLog = false;
+      }
+      if (!showSkillsWindow) lastClickedSkillSlotKey = null;
+    }
+
+    function onToggleInventory() {
+      showInventoryWindow = !showInventoryWindow;
+      if (showInventoryWindow) {
+        showSkillsWindow = false;
+        showLog = false;
+      }
     }
 
     // --- Dev Mode 狀態反應 ---
@@ -267,6 +289,9 @@
             bossApproachingMessage: "Boss is approaching! Prepare for battle!",
             log: "LOG",
             skills: "SKILLS",
+            inventory: "INVENTORY",
+            inventoryHeader: "INVENTORY",
+            stats: "STATS",
             logHeader: "MESSAGE LOG",
             skillsHeader: "SKILLS REPOSITORY",
             clear: "CLEAR",
@@ -327,6 +352,9 @@
             bossApproachingMessage: "Boss 正在逼近！準備戰鬥！",
             log: "訊息日誌",
             skills: "技能庫",
+            inventory: "物品欄",
+            inventoryHeader: "物品欄",
+            stats: "屬性狀態",
             logHeader: "訊息日誌",
             skillsHeader: "技能庫",
             clear: "清除",
@@ -480,16 +508,39 @@
 
     function spawnMonsters() {
       if (isBossMode) {
-        enemies = [generateMonster(1, 'unique')];
-      } else { // 確保場上怪物數量不超過最大值
-        const currentEnemyCount = enemies.filter(e => e.hp > 0).length;
-        const maxSlots = gameConfig.enemies?.maxEnemies || 9;
-        const enemiesToSpawn = maxSlots - currentEnemyCount;
-        for (let i = 0; i < enemiesToSpawn; i++) {
-          const newId = Math.max(...enemies.map(e => e.id), 0) + 1; // 確保 ID 唯一
-          enemies = [...enemies, generateMonster(newId, getRandomTier())];
-        }
+        enemies = [generateMonster(Date.now(), 'unique')];
+        selectedMonsterId = enemies[0].id;
+        return;
       }
+
+      const maxSlots = gameConfig.enemies?.maxEnemies || 9;
+      // 建立 9 個基礎插槽以維持 3x3 網格佈局穩定性
+      // 即使是空的插槽也需要基本的結構以防止 BattleScene 渲染錯誤
+      let newEnemies = Array.from({ length: maxSlots }, (_, i) => ({
+        id: Date.now() + i,
+        hp: 0, maxHp: 1, 
+        nameParts: { base: { en: '', zh: '' } },
+        wordType: 'white',
+        atb: 0, speed: 0
+      }));
+
+      // 決定這波怪物的實際數量 (1 到 maxSlots 隨機)
+      const waveSize = Math.floor(Math.random() * maxSlots) + 1;
+      
+      // 從 9 個位置中隨機挑選索引來放置怪物
+      const targetIndices = Array.from({ length: maxSlots }, (_, i) => i)
+        .sort(() => Math.random() - 0.5)
+        .slice(0, waveSize);
+
+      // 在選定位置生成怪物，並確保至少有一個精英怪
+      targetIndices.forEach((gridIdx, i) => {
+        const tier = (i === 0) ? (Math.random() < 0.5 ? 'magic' : 'rare') : getRandomTier();
+        newEnemies[gridIdx] = generateMonster(Date.now() + gridIdx, tier);
+      });
+
+      enemies = newEnemies;
+      const firstAlive = enemies.find(e => e.hp > 0);
+      selectedMonsterId = firstAlive ? firstAlive.id : null;
     }
   
     function updateATB() {
@@ -520,10 +571,13 @@
         const chargeSpeed = devMode ? player.speed * atbMultiplier : player.speed;
         player.atb += chargeSpeed;
         if (player.atb >= 100) {
+        // 只有在場上有活著的敵人時，ATB 滿了才進入行動選擇模式
+        if (player.atb >= 100 && enemies.filter(e => e.hp > 0).length > 0) {
           player.atb = 100; // 確保 ATB 不會超過 100
           gameState = 'ACTION_SELECT'; // 進入行動選擇狀態 (這會觸發 BattleScene 的 class:active)
           addLog(t('playerTurn'), 'info');
         }
+      }
       }
   
       // 敵人 ATB
@@ -610,8 +664,9 @@
       const upperKey = e.key.toUpperCase();
 
       // 基本 UI 切換
-      if (pressedKey === keys.toggleLog) { showLog = !showLog; return; }
-      if (pressedKey === keys.toggleSkills) { showSkillsWindow = !showSkillsWindow; return; }
+      if (pressedKey === keys.toggleLog) { onToggleLog(); return; }
+      if (pressedKey === keys.toggleSkills) { onToggleSkills(); return; }
+      if (pressedKey.toUpperCase() === (keys.toggleInventory || 'I')) { onToggleInventory(); return; }
       if (pressedKey === keys.pause) { togglePause(); return; }
 
       // 藥水快捷鍵
@@ -870,12 +925,15 @@
             player.atb = 100;
             player = player;
             gameState = 'ACTION_SELECT';
+            // 移除此處的 gameState = 'ACTION_SELECT'，改在 Boss 生成後設定
 
             addLog("--- BOSS WARNING: AN ANCIENT POWER AWAKENS ---", 'unique');
 
             setTimeout(() => {
               enemies = [generateMonster(1, 'unique')];
               selectedMonsterId = enemies[0].id;
+              spawnMonsters(); // 使用統一的 spawnMonsters 處理 Boss 生成與 ID
+              gameState = 'ACTION_SELECT'; // 在這裡才允許玩家行動
               isBossApproaching = false;
               addLog("--- BOSS ROOM ---", 'unique');
             }, gameConfig.enemies?.bossSpawnDelay || 2000);
@@ -893,17 +951,6 @@
             showComboDisplay = false;
             return;
           }
-          // 非 Boss 階段的重生邏輯
-          else if (!isBossMode) {
-            const deadId = currentTarget.id;
-            setTimeout(() => {
-              const idx = enemies.findIndex(e => e.id === deadId);
-              if (idx !== -1) { // 如果怪物位置還存在，則重生
-                enemies[idx] = generateMonster(deadId, getRandomTier()); // 在原位重生
-                enemies = enemies;
-              }
-            }, gameConfig.enemies?.respawnDelay || 1000);
-          }
 
           const aliveEnemies = enemies.filter(e => e.hp > 0);
           if (aliveEnemies.length > 0) {
@@ -912,6 +959,14 @@
             selectedMonsterId = currentTarget.id; // 確保黃色框立即移動到新目標
             moveToNextWord();
           } else {
+            // 波次清空邏輯：當波次所有敵人都死亡，且未進入 Boss 戰時，生成下一波
+            if (!isBossMode && gameScore < 100) {
+              setTimeout(() => {
+                if (gameState !== 'VICTORY' && !isBossMode) {
+                  spawnMonsters();
+                }
+              }, gameConfig.enemies?.respawnDelay || 1000);
+            }
             endBurst();
           }
         } else {
@@ -981,9 +1036,11 @@
   
   <Header 
     {t} {currentLanguage} {showLog} {showSkillsWindow} {currentTheme}
+    showInventoryWindow={showInventoryWindow}
     hotkeys={gameConfig.hotkeys || {}}
-    onToggleLog={() => showLog = !showLog}
+    onToggleLog={onToggleLog}
     onToggleSkills={onToggleSkills}
+    onToggleInventory={onToggleInventory}
     onSetTheme={setTheme}
     onToggleHelp={() => {
       showHelp = !showHelp;
@@ -998,10 +1055,6 @@
   />
 
   <div class="game-viewport">
-    {#if showLog}
-      <LogViewer {logHistory} {gameState} {t} onClear={clearLogs} />
-    {/if}
-
     <main class="game-container">
       <div class="game-main-content">
         <ModalOverlay 
@@ -1028,8 +1081,16 @@
       </div>
     </main>
 
-    {#if showSkillsWindow}
+    {#if showLog}
+      <LogViewer {logHistory} {gameState} {t} onClear={clearLogs} onToggleLog={onToggleLog} hotkeys={gameConfig.hotkeys || {}} />
+    {:else if showSkillsWindow}
       <SkillSidebar {skillDb} {equippedSkills} {currentLanguage} {t} {lastClickedSkillSlotKey} skillSlots={gameConfig.hotkeys?.skillSlots || []} hotkeys={gameConfig.hotkeys || {}} onDropSkill={handleAssignSkill} onRemoveSkill={handleRemoveSkill} onToggleSkills={onToggleSkills} onSelectSlot={(key) => lastClickedSkillSlotKey = key} />
+    {:else if showInventoryWindow}
+      <InventorySidebar 
+        {t} {player} {gameScore} 
+        hotkeys={gameConfig.hotkeys || {}} 
+        onToggleInventory={onToggleInventory} 
+      />
     {/if}
 
     {#if showHelp}

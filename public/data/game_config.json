@@ -54,8 +54,9 @@
     "maxLogEntries": 50
   },
   "hotkeys": {
-    "toggleLog": "0",
+    "toggleLog": "=",
     "toggleSkills": "9",
+    "toggleInventory": "8",
     "hpFlask": "1",
     "mpFlask": "2",
     "toggleHelp": "?",
